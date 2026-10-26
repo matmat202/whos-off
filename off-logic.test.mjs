@@ -1,0 +1,98 @@
+// node site/off-logic.test.mjs — the page's pure logic, plus the shipped data checked
+// against facts read straight out of the `holidays` library. Exit 1 on any failure.
+//   test/plant.sh   # mutates a copy of the logic; each mutant must FAIL this suite
+import { readFileSync } from 'node:fs';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+const L = await import(process.env.LOGIC ? pathToFileURL(process.env.LOGIC).href : './off-logic.js');
+
+let pass = 0, fail = 0;
+const ok = (name, cond, extra = '') => { if (cond) pass++; else { fail++; console.log(`FAIL ${name} ${extra}`); } };
+const eq = (name, a, b) => ok(name, JSON.stringify(a) === JSON.stringify(b), `got ${JSON.stringify(a)} want ${JSON.stringify(b)}`);
+
+// --- dates -----------------------------------------------------------------------------
+eq('weekday, Monday = 0', ['2026-10-26', '2026-10-31', '2026-11-01'].map(L.weekday), [0, 5, 6]);
+eq('add days across a month and a year', [L.addDays('2026-10-31', 1), L.addDays('2026-12-31', 1), L.addDays('2026-03-01', -1)],
+  ['2026-11-01', '2027-01-01', '2026-02-28']);
+eq('days between, both ways', [L.daysBetween('2026-10-26', '2026-12-25'), L.daysBetween('2026-12-25', '2026-10-26')], [60, -60]);
+eq('across a DST change is still one day', L.addDays('2026-03-08', 1), '2026-03-09');
+eq('a real date passes, a fake one fails', ['2026-02-28', '2026-02-29', '2026-13-01', '26-1-1', 'x'].map(L.isDate), [true, false, false, false, false]);
+eq('local today', L.localToday(new Date(2026, 9, 26, 23, 30)), '2026-10-26');
+eq('dates format', [L.fmtDate('2026-10-26'), L.fmtDate('2026-12-25', true)], ['Mon 26 Oct', 'Friday 25 December 2026']);
+eq('in words', [0, 1, -1, 60, -3].map(L.inWords), ['today', 'tomorrow', 'yesterday', 'in 60 days', '3 days ago']);
+eq('flags', [L.flag('DE'), L.flag('jp')], ['🇩🇪', '🇯🇵']);
+eq('regions label', [L.regionsLabel(['A']), L.regionsLabel(['A', 'B']), L.regionsLabel(['A', 'B', 'C']), L.regionsLabel(['A', 'B', 'C', 'D', 'E'])],
+  ['A', 'A and B', 'A, B and C', 'A, B, C and 2 more']);
+
+// --- a made-up world -------------------------------------------------------------------
+const fake = {
+  years: [2026],
+  countries: { AA: ['Alpha', [5, 6]], BB: ['Bravo', [4, 5]], CC: ['Charlie', [5, 6]], DD: ['Delta', [6]] },
+  sub: { CC: { N: 'North', S: 'South' } },
+  h: {
+    AA: [['2026-05-01', 'Labour Day', null], ['2026-05-01', 'Saint Day', null], ['2026-06-01', 'June Day', null]],
+    BB: [['2026-05-01', 'Workers Day', null]],
+    CC: [['2026-05-01', 'Northern Day', ['N', 'S']], ['2026-05-02', 'South Day', ['S']], ['2026-07-01', 'Charlie Day', null]],
+    DD: [],
+  },
+};
+const fi = L.index(fake);
+{
+  const o = L.on(fake, fi, '2026-05-01'); // a Friday
+  eq('national holidays, by country name', o.national.map((x) => x.cc), ['AA', 'BB']);
+  eq('two on one day become one entry', o.national[0].name, 'Labour Day · Saint Day');
+  eq('regional names its subdivisions', o.regional, [{ cc: 'CC', name: 'Northern Day', subs: ['North', 'South'] }]);
+  eq('on a Friday, the Friday-weekend countries', o.weekend, ['BB']);
+  eq('no working-weekend list on a weekday', o.working, []);
+  const sat = L.on(fake, fi, '2026-05-02');
+  eq('no weekend list on a Saturday', sat.weekend, []);
+  eq('a Sunday is a working day where the weekend is Fri–Sat', L.on(fake, fi, '2026-05-03').working, ['BB']);
+  eq('a Saturday is a working day where the weekend is Sunday only', sat.working, ['DD']);
+  eq('an empty day is empty', L.on(fake, fi, '2026-05-05').national, []);
+}
+eq('upcoming from a date, with distance', L.upcoming(fake, 'CC', '2026-05-02'),
+  [{ date: '2026-05-02', name: 'South Day', subs: ['South'], away: 0 }, { date: '2026-07-01', name: 'Charlie Day', subs: null, away: 60 }]);
+eq('next national skips regional ones', L.nextNational(fake, 'CC', '2026-04-01').date, '2026-07-01');
+eq('no next for a country with none', L.nextNational(fake, 'DD', '2026-01-01'), null);
+eq('search: code, prefix, word, substring', L.findCountries(fake, 'bb').map((c) => c.cc), ['BB']);
+eq('search by name prefix', L.findCountries(fake, 'char').map((c) => c.cc), ['CC']);
+eq('search by substring', L.findCountries(fake, 'lt').map((c) => c.cc), ['DD']);
+eq('search for nothing', L.findCountries(fake, '  '), []);
+eq('range', L.range(fake), { first: '2026-01-01', last: '2026-12-31' });
+eq('state: today is not written', L.encodeState({ date: '2026-05-01', cc: null }, '2026-05-01'), '');
+eq('state round-trips', L.decodeState(L.encodeState({ date: '2026-05-02', cc: 'CC' }, '2026-05-01'), fake, '2026-05-01'), { date: '2026-05-02', cc: 'CC' });
+eq('state: an unknown country and a bad date fall back', L.decodeState('?d=2026-02-30&c=ZZ', fake, '2026-05-01'), { date: '2026-05-01', cc: null });
+eq('state: a today outside the data clamps into it', L.decodeState('', fake, '2030-01-01').date, '2026-12-31');
+
+// --- the shipped data, against the library ---------------------------------------------
+const here = fileURLToPath(new URL('.', import.meta.url));
+const D = JSON.parse(readFileSync(here + 'data/holidays.json', 'utf8'));
+const idx = L.index(D);
+const natOn = (cc, d) => (L.on(D, idx, d).national.find((x) => x.cc === cc) || {}).name;
+// Each read from holidays 0.107 with country_holidays(cc, years=...).get(date):
+eq('China, National Day', natOn('CN', '2026-10-01'), 'National Day');
+eq('China, the week runs on: a substituted day off', natOn('CN', '2026-10-07'), 'Day off (substituted from 10/10/2026)');
+eq('India, Republic Day', natOn('IN', '2026-01-26'), 'Republic Day');
+eq('US, Thanksgiving', natOn('US', '2026-11-26'), 'Thanksgiving Day');
+eq('Japan 2027, Constitution Day', natOn('JP', '2027-05-03'), 'Constitution Day');
+eq('Saudi Arabia, National Day', natOn('SA', '2026-09-23'), 'National Day Holiday');
+eq('Germany, Unity Day', natOn('DE', '2026-10-03'), 'German Unity Day');
+eq('Christmas Day 2026 is national in 201 countries', L.on(D, idx, '2026-12-25').national.length, 201);
+{
+  const tx = L.on(D, idx, '2026-03-02').regional.find((x) => x.cc === 'US' && /Texas/.test(x.name));
+  ok('Texas Independence Day is regional, in Texas, not national', tx && /Texas Independence/.test(tx.name) && tx.subs.includes('Texas')
+    && !natOn('US', '2026-03-02'), JSON.stringify(tx));
+  const ep = L.on(D, idx, '2026-01-06').regional.find((x) => x.cc === 'DE');
+  eq('Epiphany in Germany: three states and Augsburg', ep && ep.subs, ['Augsburg', 'Baden-Württemberg', 'Bayern', 'Sachsen-Anhalt']);
+}
+eq('weekends: Iran Friday, Saudi Fri–Sat, US Sat–Sun', ['IR', 'SA', 'US'].map((c) => D.countries[c][1]), [[4], [4, 5], [5, 6]]);
+ok('a Friday names Saudi Arabia and Iran as weekend', ['SA', 'IR'].every((c) => L.on(D, idx, '2026-10-30').weekend.includes(c)));
+ok('a Sunday names Saudi Arabia and Iran as working', ['SA', 'IR'].every((c) => L.on(D, idx, '2026-11-01').working.includes(c)));
+ok('Ukraine is kept, with nothing listed and a note', D.countries.UA && D.h.UA.length === 0 && L.NOTES.UA);
+ok('two years, about 250 places', D.years.join() === '2026,2027' && Object.keys(D.countries).length > 200);
+ok('every country has a name and a weekend', Object.values(D.countries).every(([n, w]) => n.length > 2 && w.length && w.every((x) => x >= 0 && x <= 6)));
+ok('every row: a real date in range, a name, null or known subdivisions', Object.entries(D.h).every(([cc, rows]) => rows.every(([d, n, s]) =>
+  L.inRange(D, d) && n && (s === null || s.every((x) => D.sub[cc] && D.sub[cc][x])))));
+ok('rows are sorted by date', Object.values(D.h).every((rows) => rows.every((r, i) => !i || rows[i - 1][0] <= r[0])));
+
+console.log(`${fail ? 'FAIL' : 'ok'} off-logic: ${pass} passed, ${fail} failed`);
+process.exit(fail ? 1 : 0);
