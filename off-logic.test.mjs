@@ -56,6 +56,11 @@ eq('no next for a country with none', L.nextNational(fake, 'DD', '2026-01-01'), 
 eq('search: code, prefix, word, substring', L.findCountries(fake, 'bb').map((c) => c.cc), ['BB']);
 eq('search by name prefix', L.findCountries(fake, 'char').map((c) => c.cc), ['CC']);
 eq('search by substring', L.findCountries(fake, 'lt').map((c) => c.cc), ['DD']);
+eq('upcoming stops at n', L.upcoming(fake, 'AA', '2026-01-01', 2).map((x) => x.name), ['Labour Day', 'Saint Day']);
+{ // A country off nationwide is not listed again as regional for a local holiday that day.
+  const both = { ...fake, h: { ...fake.h, AA: [...fake.h.AA, ['2026-05-01', 'Local Fair', ['N']]] } };
+  eq('national beats regional on the same day', L.on(both, L.index(both), '2026-05-01').regional.map((r) => r.cc), ['CC']);
+}
 eq('search for nothing', L.findCountries(fake, '  '), []);
 eq('range', L.range(fake), { first: '2026-01-01', last: '2026-12-31' });
 eq('state: today is not written', L.encodeState({ date: '2026-05-01', cc: null }, '2026-05-01'), '');
@@ -66,6 +71,21 @@ eq('state: a today outside the data clamps into it', L.decodeState('', fake, '20
 // --- the shipped data, against the library ---------------------------------------------
 const here = fileURLToPath(new URL('.', import.meta.url));
 const D = JSON.parse(readFileSync(here + 'data/holidays.json', 'utf8'));
+// The search's tiers, written out again from its comment: exact code, name prefix, word
+// prefix, substring, then by name — checked for every two-letter query over the shipped
+// countries, so a tie between tiers shows wherever names happen to sort across it.
+{
+  const tier = (cc, name, t) => { const l = name.toLowerCase(); return cc.toLowerCase() === t ? 0 : l.startsWith(t) ? 1 : l.split(/[\s-]+/).some((w) => w.startsWith(t)) ? 2 : l.includes(t) ? 3 : 9; };
+  const bad = [];
+  for (const a of 'abcdefghijklmnopqrstuvwxyz') for (const b of 'abcdefghijklmnopqrstuvwxyz') {
+    const t = a + b, got = L.findCountries(D, t);
+    const want = Object.entries(D.countries).map(([cc, [name]]) => ({ cc, name, s: tier(cc, name, t) })).filter((c) => c.s < 9)
+      .sort((x, y) => x.s - y.s || x.name.localeCompare(y.name, 'en')).slice(0, 8).map((c) => c.cc);
+    if (JSON.stringify(got.map((c) => c.cc)) !== JSON.stringify(want)) bad.push(t);
+  }
+  eq('shipped: search ranks code, prefix, word, substring, then name (676 queries)', bad.slice(0, 5), []);
+  eq('shipped: eight results at most', L.findCountries(D, 'a').length, 8);
+}
 const idx = L.index(D);
 const natOn = (cc, d) => (L.on(D, idx, d).national.find((x) => x.cc === cc) || {}).name;
 // Each read from holidays 0.107 with country_holidays(cc, years=...).get(date):
