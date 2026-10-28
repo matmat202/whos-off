@@ -80,6 +80,7 @@ function drawDay() {
   const wd = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][L.weekday(S.date)];
   if (o.weekend.length) wn.append('Weekend on a ', h('b', null, wd), ` in ${o.weekend.length}: ${names(o.weekend)}.`);
   else if (o.working.length) wn.append('A ', h('b', null, `working ${wd}`), ` in ${o.working.length}: ${names(o.working)}.`);
+  if (o.makeup.length) wn.append(' ', h('b', null, names(o.makeup)), ` ${o.makeup.length === 1 ? 'works' : 'work'} this ${wd}: an official make-up day, traded for a day off next to a holiday.`);
 }
 
 function drawCountry() {
@@ -103,6 +104,8 @@ function drawCountry() {
   parts.push(p);
   const wk = D.countries[cc][1].map((d) => ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][d]).join('–');
   parts.push(h('p', 'tag', `Weekend: ${wk}. ${all.length - regN} nationwide and ${regN} regional holidays this year.`));
+  const mk = ((D.work || {})[cc] || []).filter((d) => d.startsWith(year));
+  if (mk.length) parts.push(h('p', 'tag', `Make-up working ${mk.length === 1 ? 'day' : 'days'} (weekend days worked to bridge a holiday): ${mk.map((d) => L.fmtDate(d)).join(', ')}.`));
   if (regN) {
     const lab = h('label', 'tag'); const cb = h('input'); cb.type = 'checkbox'; cb.checked = S.showReg; cb.id = 'showreg';
     cb.addEventListener('change', () => setState({ showReg: cb.checked }, false));

@@ -91,12 +91,15 @@ export function on(data, idx, s) {
   const national = [...nat.values()].sort(byCountry(data));
   reg.sort(byCountry(data));
   const w = weekday(s), satSun = w >= 5;
+  // A weekend day the government has made a working day (a make-up day) is not off.
+  const makeup = Object.keys(data.work || {}).filter((cc) => data.work[cc].includes(s));
+  const off = (cc, wk) => wk.includes(w) && !makeup.includes(cc);
   // Saturday and Sunday are the common weekend; name the exceptions either way.
   const odd = Object.entries(data.countries)
-    .filter(([, [, wk]]) => wk.includes(w) !== satSun)
+    .filter(([cc, [, wk]]) => off(cc, wk) !== satSun)
     .map(([cc]) => cc)
     .sort((a, b) => countryName(data, a).localeCompare(countryName(data, b), 'en'));
-  return { national, regional: reg, weekend: satSun ? [] : odd, working: satSun ? odd : [] };
+  return { national, regional: reg, weekend: satSun ? [] : odd, working: satSun ? odd : [], makeup: makeup.sort() };
 }
 
 export const nationalCount = (data, idx, s) => on(data, idx, s).national.length;

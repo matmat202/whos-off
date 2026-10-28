@@ -34,6 +34,7 @@ const fake = {
     CC: [['2026-05-01', 'Northern Day', ['N', 'S']], ['2026-05-02', 'South Day', ['S']], ['2026-07-01', 'Charlie Day', null]],
     DD: [],
   },
+  work: { AA: ['2026-05-02'], BB: ['2026-05-08'] },
 };
 const fi = L.index(fake);
 {
@@ -46,7 +47,11 @@ const fi = L.index(fake);
   const sat = L.on(fake, fi, '2026-05-02');
   eq('no weekend list on a Saturday', sat.weekend, []);
   eq('a Sunday is a working day where the weekend is Fri–Sat', L.on(fake, fi, '2026-05-03').working, ['BB']);
-  eq('a Saturday is a working day where the weekend is Sunday only', sat.working, ['DD']);
+  eq('a Saturday is a working day where the weekend is Sunday only, or it is a make-up day', sat.working, ['AA', 'DD']);
+  eq('the make-up day is named as one', sat.makeup, ['AA']);
+  eq('a make-up Friday drops out of the weekend list', L.on(fake, fi, '2026-05-08').weekend, []);
+  eq('a make-up day counts only on its date', [L.on(fake, fi, '2026-05-09').working, L.on(fake, fi, '2026-05-09').makeup, L.on(fake, fi, '2026-05-15').weekend], [['DD'], [], ['BB']]);
+  eq('no make-up data, no make-up days', L.on({ ...fake, work: undefined }, fi, '2026-05-02').working, ['DD']);
   eq('an empty day is empty', L.on(fake, fi, '2026-05-05').national, []);
 }
 eq('upcoming from a date, with distance', L.upcoming(fake, 'CC', '2026-05-02'),
@@ -107,6 +112,11 @@ eq('Christmas Day 2026 is national in 201 countries', L.on(D, idx, '2026-12-25')
 eq('weekends: Iran Friday, Saudi Fri–Sat, US Sat–Sun', ['IR', 'SA', 'US'].map((c) => D.countries[c][1]), [[4], [4, 5], [5, 6]]);
 ok('a Friday names Saudi Arabia and Iran as weekend', ['SA', 'IR'].every((c) => L.on(D, idx, '2026-10-30').weekend.includes(c)));
 ok('a Sunday names Saudi Arabia and Iran as working', ['SA', 'IR'].every((c) => L.on(D, idx, '2026-11-01').working.includes(c)));
+// make-up days, against the State Council's 2026 notice (国办发明电〔2025〕7号), not the library
+ok('China works Sat 10 Oct and Sun 4 Jan 2026 (make-up days)', ['2026-10-10', '2026-01-04'].every((d) => L.on(D, idx, d).working.includes('CN') && L.on(D, idx, d).makeup.includes('CN')));
+ok('China is off on an ordinary Saturday', !L.on(D, idx, '2026-10-17').working.includes('CN'));
+ok('China is off on its National Day break, Sat 3 Oct', natOn('CN', '2026-10-03') && !L.on(D, idx, '2026-10-03').working.includes('CN'));
+ok('every make-up day is on that country\'s weekend and in range', Object.entries(D.work).every(([cc, ds]) => ds.every((d) => L.inRange(D, d) && D.countries[cc][1].includes(L.weekday(d)))));
 ok('Ukraine is kept, with nothing listed and a note', D.countries.UA && D.h.UA.length === 0 && L.NOTES.UA);
 ok('two years, about 250 places', D.years.join() === '2026,2027' && Object.keys(D.countries).length > 200);
 ok('every country has a name and a weekend', Object.values(D.countries).every(([n, w]) => n.length > 2 && w.length && w.every((x) => x >= 0 && x <= 6)));
