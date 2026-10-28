@@ -106,6 +106,19 @@ function drawCountry() {
   parts.push(h('p', 'tag', `Weekend: ${wk}. ${all.length - regN} nationwide and ${regN} regional holidays this year.`));
   const mk = ((D.work || {})[cc] || []).filter((d) => d.startsWith(year));
   if (mk.length) parts.push(h('p', 'tag', `Make-up working ${mk.length === 1 ? 'day' : 'days'} (weekend days worked to bridge a holiday): ${mk.map((d) => L.fmtDate(d)).join(', ')}.`));
+  const br = L.breaks(D, cc, S.date).slice(0, 4);
+  if (br.length && !L.NOTES[cc]) {
+    const span = (x) => `${L.fmtDate(x.start)} – ${L.fmtDate(x.end)}${x.end.slice(0, 4) === year ? "" : " " + x.end.slice(0, 4)}`;
+    const ul = h('ul', 'breaks');
+    for (const x of br) {
+      const li = h('li');
+      li.append(h('b', null, `${x.days} days`), ` ${span(x)}`);
+      if (x.leave) li.append(h('span', 'tag', ` · take ${L.fmtDate(x.leave)} off`));
+      ul.append(li);
+    }
+    parts.push(h('h3', null, `Next long weekends${S.date === TODAY ? '' : ` after ${L.fmtDate(S.date)}`}`), ul,
+      h('p', 'tag', 'Weekend plus nationwide holidays. "Take … off" means one day of leave joins them.'));
+  }
   if (regN) {
     const lab = h('label', 'tag'); const cb = h('input'); cb.type = 'checkbox'; cb.checked = S.showReg; cb.id = 'showreg';
     cb.addEventListener('change', () => setState({ showReg: cb.checked }, false));

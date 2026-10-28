@@ -116,6 +116,37 @@ export function upcoming(data, cc, from, n = Infinity) {
 }
 export const nextNational = (data, cc, from) => upcoming(data, cc, from).find((x) => !x.subs) || null;
 
+// Long weekends: every run of 3+ days off (weekend + nationwide holidays, minus make-up
+// working days) that contains a holiday, and every single working day that, taken off,
+// joins off days into 4+ in a row. Runs that touch either end of the data are dropped,
+// since the days past it are unknown. Items end on or after `from`, sorted by start.
+export function breaks(data, cc, from) {
+  const c = data.countries[cc];
+  if (!c) return [];
+  const wk = c[1], work = new Set((data.work || {})[cc] || []);
+  const hol = new Set((data.h[cc] || []).filter((x) => !x[2]).map((x) => x[0]));
+  const { first, last } = range(data);
+  const off = (s) => !work.has(s) && (wk.includes(weekday(s)) || hol.has(s));
+  const n = daysBetween(first, last) + 1;
+  const day = (i) => addDays(first, i), isOff = [];
+  for (let i = 0; i < n; i++) isOff.push(off(day(i)));
+  // start and end index of the off run through i
+  const runAt = (i) => { let a = i, b = i; while (a > 0 && isOff[a - 1]) a--; while (b < n - 1 && isOff[b + 1]) b++; return [a, b]; };
+  const hasHol = (a, b) => { for (let i = a; i <= b; i++) if (hol.has(day(i))) return true; return false; };
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    if (isOff[i] && (i === 0 || !isOff[i - 1])) {
+      const [a, b] = runAt(i);
+      if (b - a + 1 >= 3 && a > 0 && b < n - 1 && hasHol(a, b)) out.push({ start: day(a), end: day(b), days: b - a + 1, leave: null });
+    }
+    if (!isOff[i] && i > 0 && i < n - 1 && isOff[i - 1] && isOff[i + 1]) {
+      const [a] = runAt(i - 1), [, b] = runAt(i + 1);
+      if (b - a + 1 >= 4 && a > 0 && b < n - 1 && hasHol(a, b)) out.push({ start: day(a), end: day(b), days: b - a + 1, leave: day(i) });
+    }
+  }
+  return out.filter((x) => x.end >= from).sort((x, y) => (x.start < y.start ? -1 : x.start > y.start ? 1 : (x.leave ? 1 : 0) - (y.leave ? 1 : 0)));
+}
+
 // Country search: exact code, then name prefix, then a word prefix, then substring.
 export function findCountries(data, q, n = 8) {
   const t = q.trim().toLowerCase();
