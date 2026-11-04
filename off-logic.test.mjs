@@ -101,6 +101,67 @@ eq('state: a today outside the data clamps into it', L.decodeState('', fake, '20
   eq('a Fri-Sun weekend with no holiday is not a long weekend', L.breaks({ ...bw, countries: { YY: ['Yankee', [4, 5, 6]] }, h: { YY: [] }, work: {} }, 'YY', '2026-01-01'), []);
 }
 
+// --- breaks against a brute force, on random calendars (mutwatch, 2026-11-03) -------------
+// The reference is written from breaks()' comment, not its code: every interval [a, b] whose
+// neighbours are both working days inside the data, holding a nationwide holiday, with no
+// working day in it (3+ days) or exactly one that is not at either end (4+ days).
+{
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
+  const ref = (data, cc, from) => {
+    const c = data.countries[cc], wk = c[1], work = new Set(data.work[cc] || []);
+    const hol = new Set(data.h[cc].filter((x) => !x[2]).map((x) => x[0]));
+    const days = [];
+    for (let d = `${data.years[0]}-01-01`; d <= `${data.years.at(-1)}-12-31`; d = L.addDays(d, 1)) days.push(d);
+    const off = days.map((d) => !work.has(d) && (wk.includes(L.weekday(d)) || hol.has(d)));
+    const out = [];
+    for (let a = 1; a < days.length - 1; a++) for (let b = a; b < Math.min(days.length - 1, a + 40); b++) {
+      if (off[a - 1] || off[b + 1]) continue;
+      const span = days.slice(a, b + 1), workIn = [];
+      for (let i = a; i <= b; i++) if (!off[i]) workIn.push(i);
+      if (!span.some((d) => hol.has(d))) continue;
+      const n = b - a + 1;
+      if (!workIn.length && n >= 3) out.push([days[a], days[b], n, null]);
+      if (workIn.length === 1 && workIn[0] !== a && workIn[0] !== b && n >= 4) out.push([days[a], days[b], n, days[workIn[0]]]);
+    }
+    return out.filter((x) => x[1] >= from).sort((x, y) => (x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : (x[3] ? 1 : 0) - (y[3] ? 1 : 0)));
+  };
+  const all = [];
+  for (let d = '2026-01-01'; d <= '2026-12-31'; d = L.addDays(d, 1)) all.push(d);
+  const cal = (hol, work = [], wk = [5, 6], sub = []) => ({
+    years: [2026], countries: { ZZ: ['Zulu', wk] }, sub: { ZZ: { N: 'North' } },
+    h: { ZZ: [...hol.map((d) => [d, 'H', null]), ...sub.map((d) => [d, 'R', ['N']])].sort() }, work: { ZZ: work },
+  });
+  let trials = 0, bad = 0, found = 0;
+  const check = (name, data, from = '2026-01-01') => {
+    trials++;
+    const got = L.breaks(data, 'ZZ', from).map((x) => [x.start, x.end, x.days, x.leave]), want = ref(data, 'ZZ', from);
+    found += want.length;
+    if (JSON.stringify(got) !== JSON.stringify(want)) { bad++; if (bad <= 3) console.log(`FAIL breaks vs brute force: ${name}\n  got  ${JSON.stringify(got)}\n  want ${JSON.stringify(want)}`); }
+  };
+  for (let t = 0; t < 60; t++) {
+    const pick = (p) => all.filter(() => rnd() < p);
+    const wk = [[5, 6], [4, 5], [6], [4, 5, 6]][t % 4];
+    const data = cal(pick(0.06), pick(0.02), wk, pick(0.03));
+    const ends = L.breaks(data, 'ZZ', '2026-01-01').map((x) => x.end);
+    check(`random #${t}`, data, ends.length ? ends[Math.floor(rnd() * ends.length)] : '2026-01-01');
+  }
+  // Every edge by hand: 1 Jan 2026 is a Thursday, 31 Dec a Thursday.
+  check('a run from the first day is dropped', cal(['2026-01-01', '2026-01-02']));
+  check('a run from the second day is kept', cal(['2026-01-02']));
+  check('a bridge from the second day', cal(['2026-01-02', '2026-01-06']));
+  check('a bridge whose first run starts on the first day is dropped', cal(['2026-01-01', '2026-01-02', '2026-01-06']));
+  check('a run to the last day is dropped', cal(['2026-12-29', '2026-12-30', '2026-12-31']));
+  check('a run to the next-to-last day is kept', cal(['2026-12-28', '2026-12-29', '2026-12-30']));
+  check('a bridge to the next-to-last day', cal(['2026-12-28', '2026-12-30']));
+  check('a two-day run is not a break', cal(['2026-03-03'], [], [1]));
+  check('a three-day bridge is not a break', cal(['2026-03-04'], [], [1]));
+  const yr = L.breaks(cal(['2026-12-28', '2026-12-29', '2026-12-30']), 'ZZ', '2026-01-01');
+  eq('the next-to-last day ends a break', yr.map((x) => [x.start, x.end]), [['2026-12-26', '2026-12-30']]);
+  eq('a break ending on the date is kept', L.breaks(cal(['2026-05-01']), 'ZZ', '2026-05-03').length, 1);
+  ok(`breaks match the brute force on ${trials} calendars (${found} breaks)`, bad === 0 && found > 200, `${bad} differ, ${found} found`);
+}
+
 // --- the shipped data, against the library ---------------------------------------------
 const here = fileURLToPath(new URL('.', import.meta.url));
 const D = JSON.parse(readFileSync(here + 'data/holidays.json', 'utf8'));
