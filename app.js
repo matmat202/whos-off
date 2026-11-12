@@ -5,10 +5,13 @@ const $ = (id) => document.getElementById(id);
 const h = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
 let D = null, IDX = null, TODAY = L.localToday();
-const S = { date: TODAY, cc: null, showReg: false };
+const S = { date: TODAY, cc: null, year: null, showReg: false };
 let optIdx = -1, opts = [];
 
 function setState(patch, push = true) {
+  // a new country, or a date in another year, goes back to the date's year
+  const moved = 'cc' in patch || ('date' in patch && patch.date.slice(0, 4) !== S.date.slice(0, 4));
+  if (moved && !('year' in patch)) patch = { ...patch, year: null };
   Object.assign(S, patch);
   S.date = L.clampDate(D, S.date);
   const q = L.encodeState(S, TODAY);
@@ -87,13 +90,19 @@ function drawCountry() {
   const cv = $('cv');
   if (!S.cc) { cv.hidden = true; return; }
   cv.hidden = false;
-  const cc = S.cc, year = S.date.slice(0, 4);
-  const all = L.upcoming(D, cc, `${year}-01-01`).filter((x) => x.date.startsWith(year));
+  const cc = S.cc, year = L.cardYear(D, S.date, S.year);
+  const all = L.yearHolidays(D, cc, year);
   const regN = all.filter((x) => x.subs).length;
   const close = h('button', 'x', 'close'); close.type = 'button';
   close.addEventListener('click', () => { setState({ cc: null }); $('cq').value = ''; });
   const head = h('h2'); head.append(h('span', null, L.flag(cc)), `${L.countryName(D, cc)} in ${year}`, close);
-  const parts = [head];
+  const yrs = h('div', 'yrs'); yrs.setAttribute('role', 'group'); yrs.setAttribute('aria-label', 'Year');
+  for (const y of D.years.map(String)) {
+    const b = h('button', null, y); b.type = 'button'; b.setAttribute('aria-pressed', String(y === year));
+    b.addEventListener('click', () => setState({ year: y }));
+    yrs.append(b);
+  }
+  const parts = [head, yrs];
   const nx = L.nextNational(D, cc, S.date);
   const p = h('p', 'next');
   if (L.NOTES[cc]) p.textContent = L.NOTES[cc];
@@ -103,7 +112,7 @@ function drawCountry() {
   } else p.textContent = `No more nationwide public holidays listed through ${D.years[D.years.length - 1]}.`;
   parts.push(p);
   const wk = D.countries[cc][1].map((d) => ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][d]).join('–');
-  parts.push(h('p', 'tag', `Weekend: ${wk}. ${all.length - regN} nationwide and ${regN} regional holidays this year.`));
+  parts.push(h('p', 'tag', `Weekend: ${wk}. ${all.length - regN} nationwide and ${regN} regional holidays in ${year}.`));
   const mk = ((D.work || {})[cc] || []).filter((d) => d.startsWith(year));
   if (mk.length) parts.push(h('p', 'tag', `Make-up working ${mk.length === 1 ? 'day' : 'days'} (weekend days worked to bridge a holiday): ${mk.map((d) => L.fmtDate(d)).join(', ')}.`));
   const br = L.breaks(D, cc, S.date).slice(0, 4);

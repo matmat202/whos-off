@@ -69,9 +69,22 @@ eq('upcoming stops at n', L.upcoming(fake, 'AA', '2026-01-01', 2).map((x) => x.n
 eq('search for nothing', L.findCountries(fake, '  '), []);
 eq('range', L.range(fake), { first: '2026-01-01', last: '2026-12-31' });
 eq('state: today is not written', L.encodeState({ date: '2026-05-01', cc: null }, '2026-05-01'), '');
-eq('state round-trips', L.decodeState(L.encodeState({ date: '2026-05-02', cc: 'CC' }, '2026-05-01'), fake, '2026-05-01'), { date: '2026-05-02', cc: 'CC' });
-eq('state: an unknown country and a bad date fall back', L.decodeState('?d=2026-02-30&c=ZZ', fake, '2026-05-01'), { date: '2026-05-01', cc: null });
+eq('state round-trips', L.decodeState(L.encodeState({ date: '2026-05-02', cc: 'CC' }, '2026-05-01'), fake, '2026-05-01'), { date: '2026-05-02', cc: 'CC', year: null });
+eq('state: an unknown country and a bad date fall back', L.decodeState('?d=2026-02-30&c=ZZ', fake, '2026-05-01'), { date: '2026-05-01', cc: null, year: null });
 eq('state: a today outside the data clamps into it', L.decodeState('', fake, '2030-01-01').date, '2026-12-31');
+{ // the country card's year: a second year of data, a date late in the first
+  const two = { ...fake, years: [2026, 2027], h: { ...fake.h, AA: [...fake.h.AA, ['2027-01-01', 'New Year', null], ['2027-05-01', 'Labour Day', null]] } };
+  eq('card year: the date\'s year by default', L.cardYear(two, '2026-11-12', null), '2026');
+  eq('card year: the year asked for', L.cardYear(two, '2026-11-12', '2027'), '2027');
+  eq('card year: a year outside the data is ignored', L.cardYear(two, '2026-11-12', '2031'), '2026');
+  eq('year holidays: that year only, all of it', L.yearHolidays(two, 'AA', '2027').map((x) => x.date), ['2027-01-01', '2027-05-01']);
+  eq('year holidays: none bleed in from the next year', L.yearHolidays(two, 'AA', '2026').map((x) => x.date), ['2026-05-01', '2026-05-01', '2026-06-01']);
+  eq('state: the other year is written', L.encodeState({ date: '2026-11-12', cc: 'AA', year: '2027' }, '2026-11-12'), '?c=AA&y=2027');
+  eq('state: the date\'s own year is not', L.encodeState({ date: '2026-11-12', cc: 'AA', year: '2026' }, '2026-11-12'), '?c=AA');
+  eq('state: no year without a country', L.encodeState({ date: '2026-11-12', cc: null, year: '2027' }, '2026-11-12'), '');
+  eq('state: the year round-trips', L.decodeState('?c=AA&y=2027', two, '2026-11-12'), { date: '2026-11-12', cc: 'AA', year: '2027' });
+  eq('state: a year not in the data falls back', L.decodeState('?c=AA&y=2031', two, '2026-11-12').year, null);
+}
 
 // --- long weekends (breaks) -------------------------------------------------------------
 {

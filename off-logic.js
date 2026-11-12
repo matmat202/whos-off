@@ -158,18 +158,26 @@ export function findCountries(data, q, n = 8) {
     .sort((a, b) => a.s - b.s || a.name.localeCompare(b.name, 'en')).slice(0, n).map(({ cc, name }) => ({ cc, name }));
 }
 
-export function encodeState({ date, cc }, today) {
+// The year a country's card lists: the one asked for, if the data has it, else the
+// selected date's. In November the date's year is nearly all past, hence the choice.
+export function cardYear(data, date, year) {
+  return data.years.map(String).includes(String(year)) ? String(year) : date.slice(0, 4);
+}
+export const yearHolidays = (data, cc, year) => upcoming(data, cc, `${year}-01-01`).filter((x) => x.date.startsWith(`${year}-`));
+
+export function encodeState({ date, cc, year }, today) {
   const p = new URLSearchParams();
   if (date && date !== today) p.set('d', date);
   if (cc) p.set('c', cc);
+  // written only when it differs from the date's year, so plain links stay plain
+  if (cc && year && String(year) !== (date || today).slice(0, 4)) p.set('y', String(year));
   const q = p.toString();
   return q ? '?' + q : '';
 }
 export function decodeState(search, data, today) {
   const p = new URLSearchParams(search);
-  const d = p.get('d'), c = (p.get('c') || '').toUpperCase();
-  return {
-    date: d && inRange(data, d) ? d : clampDate(data, today),
-    cc: data.countries[c] ? c : null,
-  };
+  const d = p.get('d'), c = (p.get('c') || '').toUpperCase(), y = p.get('y');
+  const date = d && inRange(data, d) ? d : clampDate(data, today);
+  const cc = data.countries[c] ? c : null;
+  return { date, cc, year: cc && y && cardYear(data, date, y) !== date.slice(0, 4) ? y : null };
 }
