@@ -51,7 +51,8 @@ function drawStrip() {
     const mine = LIST().length ? L.pinsOff(D, IDX, LIST(), d) : 0;
     b.setAttribute('aria-label', `${L.fmtDate(d)}: ${counts[k]} ${counts[k] === 1 ? 'country' : 'countries'} off` + (mine ? `, ${mine} of ${S.shared ? 'the list' : 'yours'}` : ''));
     const bar = h('span', 'bar'); bar.style.height = `${Math.round(2 + 22 * counts[k] / max)}px`;
-    b.append(h('span', null, wd), h('b', null, String(dn)), bar, h('span', 'n', String(counts[k])));
+    const slot = h('span', 'slot'); slot.append(bar);
+    b.append(h('span', null, wd), h('b', null, String(dn)), slot, h('span', 'n', String(counts[k])));
     if (LIST().length) b.append(h('span', 'pin', mine ? '★'.repeat(Math.min(mine, 3)) : ''));
     b.addEventListener('click', () => setState({ date: d }));
     li.append(b);

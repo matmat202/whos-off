@@ -39,9 +39,11 @@ label.v{position:absolute;left:-9999px}
 .strip button{width:100%;padding:6px 0 4px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--ink-2);
   display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px}
 .strip button b{font-size:14px;color:var(--ink)}
-.strip button .bar{width:60%;background:var(--bar);border-radius:2px;min-height:2px}
+/* a fixed slot, bars grow up from its floor: a busy day no longer makes its cell taller than the row */
+.strip button .slot{width:60%;height:24px;display:flex;align-items:flex-end}
+.strip button .bar{width:100%;background:var(--bar);border-radius:2px;min-height:2px}
 .strip button .n{font-variant-numeric:tabular-nums}
-.strip button[aria-current="date"]{border:2px solid var(--accent)}
+.strip button[aria-current="date"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)} /* not a 2px border: that made the cell 2px taller */
 .strip button.we{background:var(--soft)}
 h2{font-size:18px;margin:18px 0 8px}
 h2 small{font-size:13px;font-weight:400;color:var(--ink-2)}
