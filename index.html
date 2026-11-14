@@ -95,6 +95,13 @@ ul.list .r{grid-column:2;color:var(--ink-3);font-size:12px}
 .mine .s.part{color:var(--ink)}
 .mine .s.on{color:var(--ink-2)}
 .mine .nx{grid-column:2/4;font-size:12px;color:var(--ink-3)}
+.mine.shared{border:2px dashed var(--accent)}
+.mineact{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:8px 0 0}
+.mineact button{border:1px solid var(--line);background:var(--card);color:var(--ink-2);border-radius:8px;padding:5px 10px;font-size:12px}
+.mineact #savelist{border-color:var(--accent);color:var(--accent);font-weight:600}
+.mine .tag{font-size:12px;color:var(--ink-3);margin:4px 0 0}
+.mine .tag:empty{display:none}
+.mine .tag a{color:var(--accent);word-break:break-all}
 .strip button .pin{font-size:10px;line-height:1;color:var(--accent);font-weight:700;min-height:10px}
 .cv .pinb{border:1px solid var(--accent);background:var(--card);color:var(--accent);border-radius:8px;padding:3px 8px;font-size:12px}
 .cv .pinb[aria-pressed="true"]{background:var(--accent);color:var(--card)}
@@ -123,6 +130,8 @@ input,select,textarea{font-size:16px!important}
 <section class="mine" id="mine" aria-labelledby="minehead" hidden>
   <h2 id="minehead"></h2>
   <ul id="minelist"></ul>
+  <div class="mineact" id="mineact"></div>
+  <p class="tag" id="sharemsg" aria-live="polite"></p>
 </section>
 
 <section id="day" aria-live="polite">

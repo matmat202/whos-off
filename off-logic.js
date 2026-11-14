@@ -165,13 +165,15 @@ export function cardYear(data, date, year) {
 }
 export const yearHolidays = (data, cc, year) => upcoming(data, cc, `${year}-01-01`).filter((x) => x.date.startsWith(`${year}-`));
 
-export function encodeState({ date, cc, year }, today) {
+export function encodeState({ date, cc, year, shared }, today) {
   const p = new URLSearchParams();
   if (date && date !== today) p.set('d', date);
   if (cc) p.set('c', cc);
   // written only when it differs from the date's year, so plain links stay plain
   if (cc && year && String(year) !== (date || today).slice(0, 4)) p.set('y', String(year));
-  const q = p.toString();
+  // a shared list rides along in every link until it is saved or put away
+  if (shared && shared.length) p.set('p', shared.join(','));
+  const q = p.toString().replace(/%2C/g, ',');
   return q ? '?' + q : '';
 }
 export function decodeState(search, data, today) {
@@ -179,8 +181,13 @@ export function decodeState(search, data, today) {
   const d = p.get('d'), c = (p.get('c') || '').toUpperCase(), y = p.get('y');
   const date = d && inRange(data, d) ? d : clampDate(data, today);
   const cc = data.countries[c] ? c : null;
-  return { date, cc, year: cc && y && cardYear(data, date, y) !== date.slice(0, 4) ? y : null };
+  const shared = parsePins(p.get('p'), data);
+  return { date, cc, year: cc && y && cardYear(data, date, y) !== date.slice(0, 4) ? y : null, shared: shared.length ? shared : null };
 }
+// The link that shows someone else your list: today, no country open, just ?p=.
+export const shareQuery = (pins) => (pins.length ? '?p=' + pins.join(',') : '');
+// A shared list that is the same as yours (same codes, same order) is just yours.
+export const sharedDiffers = (shared, pins) => !!shared && shared.join() !== pins.join();
 
 // --- your countries: a short list pinned in localStorage --------------------------------
 // The stored value is the user's, so read it defensively: JSON array or "US,GB", unknown

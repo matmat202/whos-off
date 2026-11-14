@@ -5,13 +5,15 @@ const $ = (id) => document.getElementById(id);
 const h = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
 
 let D = null, IDX = null, TODAY = L.localToday();
-const S = { date: TODAY, cc: null, year: null, showReg: false };
+const S = { date: TODAY, cc: null, year: null, showReg: false, shared: null };
 let optIdx = -1, opts = [];
 // Your countries live in this browser only, like everything else here.
 const PINS_KEY = 'whos-off.pins';
 let PINS = [];
 const loadPins = () => { try { return localStorage.getItem(PINS_KEY); } catch { return null; } };
 function savePins() { try { localStorage.setItem(PINS_KEY, JSON.stringify(PINS)); } catch { /* private mode: pins last this visit */ } }
+// The list on show: one shared by link (?p=), else yours. A shared list never overwrites yours unasked.
+const LIST = () => S.shared || PINS;
 
 function setState(patch, push = true) {
   // a new country, or a date in another year, goes back to the date's year
@@ -46,11 +48,11 @@ function drawStrip() {
     const { wd, d: dn } = L.fmtShortDay(d);
     if (L.weekday(d) >= 5) b.classList.add('we');
     if (d === S.date) b.setAttribute('aria-current', 'date');
-    const mine = PINS.length ? L.pinsOff(D, IDX, PINS, d) : 0;
-    b.setAttribute('aria-label', `${L.fmtDate(d)}: ${counts[k]} ${counts[k] === 1 ? 'country' : 'countries'} off` + (mine ? `, ${mine} of yours` : ''));
+    const mine = LIST().length ? L.pinsOff(D, IDX, LIST(), d) : 0;
+    b.setAttribute('aria-label', `${L.fmtDate(d)}: ${counts[k]} ${counts[k] === 1 ? 'country' : 'countries'} off` + (mine ? `, ${mine} of ${S.shared ? 'the list' : 'yours'}` : ''));
     const bar = h('span', 'bar'); bar.style.height = `${Math.round(2 + 22 * counts[k] / max)}px`;
     b.append(h('span', null, wd), h('b', null, String(dn)), bar, h('span', 'n', String(counts[k])));
-    if (PINS.length) b.append(h('span', 'pin', mine ? '★'.repeat(Math.min(mine, 3)) : ''));
+    if (LIST().length) b.append(h('span', 'pin', mine ? '★'.repeat(Math.min(mine, 3)) : ''));
     b.addEventListener('click', () => setState({ date: d }));
     li.append(b);
     return li;
@@ -63,12 +65,15 @@ const STATUS = {
 };
 function drawMine() {
   const box = $('mine');
-  $('pinhint').hidden = PINS.length > 0;
-  if (!PINS.length) { box.hidden = true; return; }
+  const list = LIST();
+  $('pinhint').hidden = list.length > 0;
+  if (!list.length) { box.hidden = true; return; }
   box.hidden = false;
-  const days = PINS.map((cc) => L.dayFor(D, IDX, cc, S.date));
+  box.classList.toggle('shared', !!S.shared);
+  const days = list.map((cc) => L.dayFor(D, IDX, cc, S.date));
   const offN = days.filter((x) => x.kind === 'holiday' || x.kind === 'weekend').length;
-  $('minehead').textContent = `Your countries · ${L.fmtDate(S.date)} · ${offN ? `${offN} of ${PINS.length} off` : 'all working'}`;
+  $('minehead').textContent = `${S.shared ? 'Shared list' : 'Your countries'} · ${L.fmtDate(S.date)} · ${offN ? `${offN} of ${list.length} off` : 'all working'}`;
+  drawMineActions();
   $('minelist').replaceChildren(...days.map((x) => {
     const li = h('li'), b = h('button'); b.type = 'button';
     const [cls, label] = STATUS[x.kind];
@@ -81,6 +86,25 @@ function drawMine() {
     b.addEventListener('click', () => { $('cq').value = L.countryName(D, x.cc); setState({ cc: x.cc }); $('cv').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
     li.append(b);
     return li;
+  }));
+}
+
+function drawMineActions() {
+  const act = $('mineact'), msg = $('sharemsg');
+  const btn = (id, text, fn) => { const b = h('button', null, text); b.type = 'button'; b.id = id; b.addEventListener('click', fn); return b; };
+  if (S.shared) {
+    msg.textContent = '';
+    act.replaceChildren(h('span', 'tag', PINS.length ? 'Opened from a link — your own countries are kept.' : 'Opened from a link.'),
+      btn('savelist', PINS.length ? 'Make these my countries' : 'Keep these as my countries', () => { PINS = [...S.shared]; savePins(); setState({ shared: null }); }),
+      btn('droplist', PINS.length ? 'Back to mine' : 'Put away', () => setState({ shared: null })));
+    return;
+  }
+  act.replaceChildren(btn('sharelist', 'Share this list', async () => {
+    const url = location.origin + location.pathname + L.shareQuery(PINS);
+    let ok = false;
+    try { await navigator.clipboard.writeText(url); ok = true; } catch { /* no clipboard: show the link to copy by hand */ }
+    msg.textContent = ok ? 'Link copied — whoever opens it sees these countries, without losing their own.' : 'Copy this link: ';
+    if (!ok) { const a = h('a', null, url); a.href = url; msg.append(a); }
   }));
 }
 
@@ -249,6 +273,7 @@ fetch('data/holidays.json').then((r) => { if (!r.ok) throw new Error(r.status); 
   $('ver').textContent = d.version;
   const st = L.decodeState(location.search, d, TODAY);
   if (st.cc) $('cq').value = L.countryName(d, st.cc);
+  if (!L.sharedDiffers(st.shared, PINS)) st.shared = null; // a link to your own list is just your list
   setState(st, false);
 }).catch((e) => {
   $('head').textContent = `Could not load the holidays (${e.message}). Reload to try again.`;

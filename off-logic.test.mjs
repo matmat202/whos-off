@@ -69,8 +69,8 @@ eq('upcoming stops at n', L.upcoming(fake, 'AA', '2026-01-01', 2).map((x) => x.n
 eq('search for nothing', L.findCountries(fake, '  '), []);
 eq('range', L.range(fake), { first: '2026-01-01', last: '2026-12-31' });
 eq('state: today is not written', L.encodeState({ date: '2026-05-01', cc: null }, '2026-05-01'), '');
-eq('state round-trips', L.decodeState(L.encodeState({ date: '2026-05-02', cc: 'CC' }, '2026-05-01'), fake, '2026-05-01'), { date: '2026-05-02', cc: 'CC', year: null });
-eq('state: an unknown country and a bad date fall back', L.decodeState('?d=2026-02-30&c=ZZ', fake, '2026-05-01'), { date: '2026-05-01', cc: null, year: null });
+eq('state round-trips', L.decodeState(L.encodeState({ date: '2026-05-02', cc: 'CC' }, '2026-05-01'), fake, '2026-05-01'), { date: '2026-05-02', cc: 'CC', year: null, shared: null });
+eq('state: an unknown country and a bad date fall back', L.decodeState('?d=2026-02-30&c=ZZ', fake, '2026-05-01'), { date: '2026-05-01', cc: null, year: null, shared: null });
 eq('state: a today outside the data clamps into it', L.decodeState('', fake, '2030-01-01').date, '2026-12-31');
 { // the country card's year: a second year of data, a date late in the first
   const two = { ...fake, years: [2026, 2027], h: { ...fake.h, AA: [...fake.h.AA, ['2027-01-01', 'New Year', null], ['2027-05-01', 'Labour Day', null]] } };
@@ -82,11 +82,22 @@ eq('state: a today outside the data clamps into it', L.decodeState('', fake, '20
   eq('state: the other year is written', L.encodeState({ date: '2026-11-12', cc: 'AA', year: '2027' }, '2026-11-12'), '?c=AA&y=2027');
   eq('state: the date\'s own year is not', L.encodeState({ date: '2026-11-12', cc: 'AA', year: '2026' }, '2026-11-12'), '?c=AA');
   eq('state: no year without a country', L.encodeState({ date: '2026-11-12', cc: null, year: '2027' }, '2026-11-12'), '');
-  eq('state: the year round-trips', L.decodeState('?c=AA&y=2027', two, '2026-11-12'), { date: '2026-11-12', cc: 'AA', year: '2027' });
+  eq('state: the year round-trips', L.decodeState('?c=AA&y=2027', two, '2026-11-12'), { date: '2026-11-12', cc: 'AA', year: '2027', shared: null });
   eq('state: a year not in the data falls back', L.decodeState('?c=AA&y=2031', two, '2026-11-12').year, null);
 }
 
 // --- your countries (pins) -------------------------------------------------------------
+// a team's list by link: ?p=AA,CC, read like stored pins, kept in every link the page writes
+eq('shared list: a link names the countries, commas unescaped', L.shareQuery(['AA', 'CC']), '?p=AA,CC');
+eq('shared list: no pins, no link', L.shareQuery([]), '');
+eq('shared list: read like pins (case, unknown, duplicates), order kept',
+  L.decodeState('?p=cc,ZZ,aa,CC', fake, '2026-05-01').shared, ['CC', 'AA']);
+eq('shared list: nothing usable is no shared list', [L.decodeState('?p=ZZ', fake, '2026-05-01').shared, L.decodeState('?p=', fake, '2026-05-01').shared], [null, null]);
+eq('shared list: survives a date and a country being chosen',
+  L.encodeState({ date: '2026-05-02', cc: 'BB', shared: ['AA', 'CC'] }, '2026-05-01'), '?d=2026-05-02&c=BB&p=AA,CC');
+eq('shared list: round-trips', L.decodeState(L.encodeState({ date: '2026-05-01', cc: null, shared: ['BB', 'AA'] }, '2026-05-01'), fake, '2026-05-01').shared, ['BB', 'AA']);
+eq('shared list: the same as yours is yours; another order or set is not',
+  [L.sharedDiffers(['AA', 'CC'], ['AA', 'CC']), L.sharedDiffers(['CC', 'AA'], ['AA', 'CC']), L.sharedDiffers(['AA'], []), L.sharedDiffers(null, ['AA'])], [false, true, true, false]);
 eq('pins: JSON or comma list, unknown and duplicate codes dropped, order kept',
   [L.parsePins('["cc","AA","ZZ","CC"]', fake), L.parsePins('bb, aa', fake)], [['CC', 'AA'], ['BB', 'AA']]);
 eq('pins: junk in storage is no pins', [L.parsePins(null, fake), L.parsePins('{"a":1}', fake), L.parsePins('', fake)], [[], [], []]);
