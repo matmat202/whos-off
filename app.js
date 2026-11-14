@@ -7,6 +7,11 @@ const h = (tag, cls, text) => { const e = document.createElement(tag); if (cls) 
 let D = null, IDX = null, TODAY = L.localToday();
 const S = { date: TODAY, cc: null, year: null, showReg: false };
 let optIdx = -1, opts = [];
+// Your countries live in this browser only, like everything else here.
+const PINS_KEY = 'whos-off.pins';
+let PINS = [];
+const loadPins = () => { try { return localStorage.getItem(PINS_KEY); } catch { return null; } };
+function savePins() { try { localStorage.setItem(PINS_KEY, JSON.stringify(PINS)); } catch { /* private mode: pins last this visit */ } }
 
 function setState(patch, push = true) {
   // a new country, or a date in another year, goes back to the date's year
@@ -22,6 +27,7 @@ function setState(patch, push = true) {
 function render() {
   $('date').value = S.date;
   drawStrip();
+  drawMine();
   drawDay();
   drawCountry();
 }
@@ -40,10 +46,39 @@ function drawStrip() {
     const { wd, d: dn } = L.fmtShortDay(d);
     if (L.weekday(d) >= 5) b.classList.add('we');
     if (d === S.date) b.setAttribute('aria-current', 'date');
-    b.setAttribute('aria-label', `${L.fmtDate(d)}: ${counts[k]} ${counts[k] === 1 ? 'country' : 'countries'} off`);
+    const mine = PINS.length ? L.pinsOff(D, IDX, PINS, d) : 0;
+    b.setAttribute('aria-label', `${L.fmtDate(d)}: ${counts[k]} ${counts[k] === 1 ? 'country' : 'countries'} off` + (mine ? `, ${mine} of yours` : ''));
     const bar = h('span', 'bar'); bar.style.height = `${Math.round(2 + 22 * counts[k] / max)}px`;
     b.append(h('span', null, wd), h('b', null, String(dn)), bar, h('span', 'n', String(counts[k])));
+    if (PINS.length) b.append(h('span', 'pin', mine ? '★'.repeat(Math.min(mine, 3)) : ''));
     b.addEventListener('click', () => setState({ date: d }));
+    li.append(b);
+    return li;
+  }));
+}
+
+const STATUS = {
+  holiday: ['off', 'Off'], weekend: ['off', 'Weekend'], makeup: ['on', 'Working (make-up day)'],
+  regional: ['part', 'Off in some regions'], working: ['on', 'Working day'],
+};
+function drawMine() {
+  const box = $('mine');
+  $('pinhint').hidden = PINS.length > 0;
+  if (!PINS.length) { box.hidden = true; return; }
+  box.hidden = false;
+  const days = PINS.map((cc) => L.dayFor(D, IDX, cc, S.date));
+  const offN = days.filter((x) => x.kind === 'holiday' || x.kind === 'weekend').length;
+  $('minehead').textContent = `Your countries · ${L.fmtDate(S.date)} · ${offN ? `${offN} of ${PINS.length} off` : 'all working'}`;
+  $('minelist').replaceChildren(...days.map((x) => {
+    const li = h('li'), b = h('button'); b.type = 'button';
+    const [cls, label] = STATUS[x.kind];
+    b.append(h('span', 'f', L.flag(x.cc)), h('span', 'c', L.countryName(D, x.cc)), h('span', 's ' + cls, label));
+    let detail = x.kind === 'holiday' ? x.name : x.kind === 'regional' ? `${x.name}, in ${L.regionsLabel(x.subs)}` : '';
+    const gap = x.next && L.daysBetween(S.date, x.next.date);
+    const nx = x.next ? `next: ${x.next.name}, ${L.fmtDate(x.next.date)} (${S.date === TODAY ? L.inWords(gap) : `${gap} ${gap === 1 ? 'day' : 'days'} later`})` : '';
+    if (L.NOTES[x.cc]) detail = L.NOTES[x.cc];
+    b.append(h('span', 'nx', [detail, L.NOTES[x.cc] ? '' : nx].filter(Boolean).join(' · ')));
+    b.addEventListener('click', () => { $('cq').value = L.countryName(D, x.cc); setState({ cc: x.cc }); $('cv').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
     li.append(b);
     return li;
   }));
@@ -95,7 +130,12 @@ function drawCountry() {
   const regN = all.filter((x) => x.subs).length;
   const close = h('button', 'x', 'close'); close.type = 'button';
   close.addEventListener('click', () => { setState({ cc: null }); $('cq').value = ''; });
-  const head = h('h2'); head.append(h('span', null, L.flag(cc)), `${L.countryName(D, cc)} in ${year}`, close);
+  const pinned = PINS.includes(cc);
+  const pin = h('button', 'pinb', pinned ? '★ Pinned' : '☆ Pin'); pin.type = 'button'; pin.id = 'pin';
+  pin.setAttribute('aria-pressed', String(pinned));
+  pin.title = pinned ? 'Remove from your countries' : 'Keep at the top of the page, in this browser';
+  pin.addEventListener('click', () => { PINS = L.togglePin(PINS, cc); savePins(); render(); });
+  const head = h('h2'); head.append(h('span', null, L.flag(cc)), `${L.countryName(D, cc)} in ${year}`, pin, close);
   const yrs = h('div', 'yrs'); yrs.setAttribute('role', 'group'); yrs.setAttribute('aria-label', 'Year');
   for (const y of D.years.map(String)) {
     const b = h('button', null, y); b.type = 'button'; b.setAttribute('aria-pressed', String(y === year));
@@ -202,6 +242,7 @@ document.addEventListener('keydown', (e) => {
 
 fetch('data/holidays.json').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }).then((d) => {
   D = d; IDX = L.index(d);
+  PINS = L.parsePins(loadPins(), d);
   const { first, last } = L.range(d);
   $('date').min = first; $('date').max = last;
   $('years').textContent = `${d.years[0]}–${d.years[d.years.length - 1]}`;

@@ -86,6 +86,24 @@ eq('state: a today outside the data clamps into it', L.decodeState('', fake, '20
   eq('state: a year not in the data falls back', L.decodeState('?c=AA&y=2031', two, '2026-11-12').year, null);
 }
 
+// --- your countries (pins) -------------------------------------------------------------
+eq('pins: JSON or comma list, unknown and duplicate codes dropped, order kept',
+  [L.parsePins('["cc","AA","ZZ","CC"]', fake), L.parsePins('bb, aa', fake)], [['CC', 'AA'], ['BB', 'AA']]);
+eq('pins: junk in storage is no pins', [L.parsePins(null, fake), L.parsePins('{"a":1}', fake), L.parsePins('', fake)], [[], [], []]);
+eq('pins: toggle adds at the end and removes', [L.togglePin(['AA'], 'CC'), L.togglePin(['AA', 'CC'], 'AA')], [['AA', 'CC'], ['CC']]);
+{
+  const k = (cc, s) => L.dayFor(fake, fi, cc, s).kind;
+  eq('pins: holiday on a Friday, Friday weekend, regional, working',
+    ['AA', 'BB', 'CC', 'DD'].map((cc) => k(cc, '2026-05-01')), ['holiday', 'holiday', 'regional', 'working']);
+  eq('pins: two holidays on one day name both', L.dayFor(fake, fi, 'AA', '2026-05-01').name, 'Labour Day · Saint Day');
+  eq('pins: a make-up Saturday is worked, a plain one is weekend', [k('AA', '2026-05-02'), k('AA', '2026-05-09')], ['makeup', 'weekend']);
+  eq('pins: the weekend beats a regional holiday', k('CC', '2026-05-02'), 'weekend');
+  eq('pins: the regional one names its regions', L.dayFor(fake, fi, 'CC', '2026-05-01').subs, ['North', 'South']);
+  eq('pins: where the weekend is Fri–Sat, Saturday is off and Sunday worked', [k('BB', '2026-05-09'), k('BB', '2026-05-03')], ['weekend', 'working']);
+  eq('pins: next nationwide is after the day, not the day itself', L.dayFor(fake, fi, 'AA', '2026-05-01').next.date, '2026-06-01');
+  eq('pins: off count on the strip is nationwide only', [L.pinsOff(fake, fi, ['AA', 'BB', 'CC', 'DD'], '2026-05-01'), L.pinsOff(fake, fi, ['CC'], '2026-05-01')], [2, 0]);
+}
+
 // --- long weekends (breaks) -------------------------------------------------------------
 {
   const bw = {

@@ -181,3 +181,38 @@ export function decodeState(search, data, today) {
   const cc = data.countries[c] ? c : null;
   return { date, cc, year: cc && y && cardYear(data, date, y) !== date.slice(0, 4) ? y : null };
 }
+
+// --- your countries: a short list pinned in localStorage --------------------------------
+// The stored value is the user's, so read it defensively: JSON array or "US,GB", unknown
+// codes dropped, duplicates dropped, order kept, at most MAX_PINS.
+export const MAX_PINS = 20;
+export function parsePins(raw, data) {
+  let list = [];
+  try { list = JSON.parse(raw); } catch { list = String(raw || '').split(','); }
+  if (!Array.isArray(list)) return [];
+  const out = [];
+  for (const x of list) {
+    const cc = String(x).trim().toUpperCase();
+    if (data.countries[cc] && !out.includes(cc)) out.push(cc);
+    if (out.length >= MAX_PINS) break;
+  }
+  return out;
+}
+export const togglePin = (pins, cc) => (pins.includes(cc) ? pins.filter((x) => x !== cc) : [...pins, cc].slice(0, MAX_PINS));
+
+// One country's day: a nationwide holiday beats the weekend, the weekend beats a regional
+// holiday (everyone is off anyway), and a make-up day is a working weekend day.
+export function dayFor(data, idx, cc, s) {
+  const rows = (idx.get(s) || []).filter((r) => r.cc === cc);
+  const nat = rows.filter((r) => !r.subs);
+  const next = nextNational(data, cc, addDays(s, 1));
+  if (nat.length) return { cc, kind: 'holiday', name: nat.map((r) => r.name).join(' · '), next };
+  const w = weekday(s), makeup = ((data.work || {})[cc] || []).includes(s);
+  if (data.countries[cc][1].includes(w) && !makeup) return { cc, kind: 'weekend', next };
+  if (makeup) return { cc, kind: 'makeup', next };
+  const reg = rows.find((r) => r.subs);
+  if (reg) return { cc, kind: 'regional', name: reg.name, subs: reg.subs.map((x) => subName(data, cc, x)), next };
+  return { cc, kind: 'working', next };
+}
+// How many pinned countries have a nationwide holiday on s (the strip's marker).
+export const pinsOff = (data, idx, pins, s) => pins.filter((cc) => dayFor(data, idx, cc, s).kind === 'holiday').length;

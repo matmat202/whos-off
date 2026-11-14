@@ -81,6 +81,24 @@ ul.list .r{grid-column:2;color:var(--ink-3);font-size:12px}
 .cv .yrs button{border:1px solid var(--line);background:var(--card);color:var(--ink-2);border-radius:8px;padding:5px 14px;font-size:13px}
 .cv .yrs button[aria-pressed="true"]{border:2px solid var(--accent);color:var(--ink);font-weight:600}
 .cv .x{border:1px solid var(--line);background:var(--card);color:var(--ink-2);border-radius:8px;padding:3px 8px;font-size:12px}
+.mine{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:14px 0 0}
+.mine h2{font-size:15px;margin:0 0 6px}
+.mine ul{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.mine li button{width:100%;text-align:left;border:0;background:none;color:var(--ink);padding:6px 2px;border-radius:8px;
+  display:grid;grid-template-columns:auto 1fr auto;gap:0 8px;align-items:baseline}
+.mine li button:hover{background:var(--soft)}
+.mine li+li button{border-top:1px solid var(--line);border-radius:0}
+.mine .f{font-size:17px;grid-row:span 2;align-self:center}
+.mine .c{font-weight:600}
+.mine .s{font-size:13px;text-align:right;white-space:nowrap}
+.mine .s.off{color:var(--accent);font-weight:600}
+.mine .s.part{color:var(--ink)}
+.mine .s.on{color:var(--ink-2)}
+.mine .nx{grid-column:2/4;font-size:12px;color:var(--ink-3)}
+.strip button .pin{font-size:10px;line-height:1;color:var(--accent);font-weight:700;min-height:10px}
+.cv .pinb{border:1px solid var(--accent);background:var(--card);color:var(--accent);border-radius:8px;padding:3px 8px;font-size:12px}
+.cv .pinb[aria-pressed="true"]{background:var(--accent);color:var(--card)}
+.hint{font-size:12px;color:var(--ink-3);margin:8px 2px 0}
 footer{font-size:12px;color:var(--ink-2);line-height:1.5;margin:18px 2px 8px}
 [hidden]{display:none!important}
 @media (max-width:560px){.strip{grid-template-columns:repeat(7,1fr)}}
@@ -102,6 +120,11 @@ input,select,textarea{font-size:16px!important}
 </div>
 <ol class="strip" id="strip" aria-label="Countries off, day by day"></ol>
 
+<section class="mine" id="mine" aria-labelledby="minehead" hidden>
+  <h2 id="minehead"></h2>
+  <ul id="minelist"></ul>
+</section>
+
 <section id="day" aria-live="polite">
   <h2 id="head"></h2>
   <ul class="list" id="national"></ul>
@@ -120,6 +143,7 @@ input,select,textarea{font-size:16px!important}
     <button>Show</button>
   </form>
   <div class="cv" id="cv" hidden></div>
+  <p class="hint" id="pinhint">Tip: open a country and press <b>☆ Pin</b> to keep it at the top — your countries, at a glance, every day.</p>
 </section>
 
 <footer>
