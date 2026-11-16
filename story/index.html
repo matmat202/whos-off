@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The days nobody is off · Who's Off, a story</title>
+<meta name="description" content="A story from Who's Off: of 247 countries and territories, on 15 days of 2026 not one has a nationwide public holiday, two of them Friday the 13th. On the middle day only 4 are off; holidays pile onto a few dates, 227 countries on New Year's Day. Counted by people, 1 May 2026 is the world's biggest day off, but only because India's Buddha Purnima falls on it; without India, New Year wins.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="plot" aria-hidden="true"></div>
+<p id="err" role="alert"></p>
+<main>
+
+<section class="step" data-step="count"><div>
+  <p class="kicker">Who's Off · a story</p>
+  <h1>The days nobody is off</h1>
+  <p>With <b data-fact="n_countries"></b> countries and territories, each with its own
+  holidays, surely every day of the year is a day off somewhere?</p>
+  <p>I went through every day of <b data-fact="year"></b> the way
+  <a href="../">Who's Off</a> does, counting the countries with a public holiday held
+  nationwide. Each grey bar is a day, January on the left; its height is how many
+  countries are off.</p>
+  <p class="small">Scroll ↓</p>
+</div></section>
+
+<section class="step" data-step="count"><div>
+  <p class="kicker">Chapter 1 · A few big days</p>
+  <h2>Most days, almost nobody</h2>
+  <p>On <b data-fact="max_day"></b>, <b data-fact="max_nat"></b> countries are off. On the
+  middle day of the year it is <b data-fact="median_nat"></b>, and on
+  <b data-fact="one"></b> days just one.</p>
+  <p>Holidays <span class="w">pile onto a handful of dates</span>: New Year, Christmas,
+  May Day, Easter and the two Eids. Between them the bars are a stubble.</p>
+</div></section>
+
+<section class="step" data-step="zero"><div>
+  <p class="kicker">Chapter 2 · Nowhere</p>
+  <h2><span data-fact="zero_words" class="cap"></span> days, nowhere</h2>
+  <p>On <b data-fact="zero"></b> days of <b data-fact="year"></b>, the red marks, not one
+  of the <b data-fact="n_countries"></b> has a nationwide public holiday.
+  <b data-fact="zero_weekdays"></b> of them are weekdays:
+  <b data-fact="zero_list"></b>. <span class="w">Two are Friday the 13th.</span></p>
+  <p>Count the holidays held only in some states or provinces too, and there are still
+  <b data-fact="zero_any"></b>. The library can only estimate some Islamic dates, which
+  wait on the moon; move every estimated one a day either way and there are
+  <span class="w">still at least <b data-fact="zero_sure"></b></span>. And it is not
+  this year’s luck: <b data-fact="next_year"></b> has <b data-fact="zero:2027"></b>.</p>
+</div></section>
+
+<section class="step" data-step="people"><div>
+  <p class="kicker">Chapter 3 · Counting people</p>
+  <h2>May Day, by a coincidence</h2>
+  <p>Count people instead of countries, and only the ones who would otherwise be at work:
+  a holiday on a country’s weekend gives nobody a day off. On the middle day of the
+  year that is <b data-fact="median_people"></b> of the world’s
+  <b data-fact="billion"></b>.</p>
+  <p>The biggest day is <b data-fact="top_day"></b>: <b data-fact="may1"></b> of
+  everyone, against <b data-fact="jan1"></b> on New Year’s Day. But India, a sixth of the
+  world, does not keep 1 May nationwide; <span class="w">its Buddha Purnima happens to fall on it
+  this year</span>. Leave India out and New Year wins, <b data-fact="jan1_exin"></b> to
+  <b data-fact="may1_exin"></b>.</p>
+</div></section>
+
+<section class="step" data-step="zero"><div>
+  <p class="kicker">Epilogue · Reading Who's Off</p>
+  <h2>A quiet day is a good day to book</h2>
+  <p>The strip of fourteen days at the top of <a href="../">Who's Off</a> draws the same
+  bars. A day with no bar is one of these: nobody’s office is shut for a holiday.</p>
+  <p class="small">Data: the site’s own public holidays from the open-source
+  <a href="https://github.com/vacanza/holidays">holidays</a> library (MIT), nationwide
+  only unless said; weekends and make-up working days as the page reads them; people
+  from <a href="https://www.geonames.org/">GeoNames</a> countryInfo (CC BY 4.0). A
+  holiday does not close every workplace, and an estimated date can move by a day. The
+  program is <a href="https://github.com/matmat202/whos-off/blob/main/story/build_story.py">in
+  the repository</a>.</p>
+</div></section>
+
+</main>
+<script type="module" src="story.js"></script>
+</body>
+</html>
