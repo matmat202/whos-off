@@ -21,7 +21,7 @@ function setState(patch, push = true) {
   if (moved && !('year' in patch)) patch = { ...patch, year: null };
   Object.assign(S, patch);
   S.date = L.clampDate(D, S.date);
-  const q = L.encodeState(S, TODAY);
+  const q = L.encodeState(S, TODAY, D);
   if (push && q !== location.search) history.replaceState(null, '', location.pathname + q);
   render();
 }
@@ -150,7 +150,7 @@ function drawCountry() {
   const cv = $('cv');
   if (!S.cc) { cv.hidden = true; return; }
   cv.hidden = false;
-  const cc = S.cc, year = L.cardYear(D, S.date, S.year);
+  const cc = S.cc, year = L.cardYear(D, S.date, S.year, S.cc);
   const all = L.yearHolidays(D, cc, year);
   const regN = all.filter((x) => x.subs).length;
   const close = h('button', 'x', 'close'); close.type = 'button';

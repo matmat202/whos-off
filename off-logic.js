@@ -159,18 +159,27 @@ export function findCountries(data, q, n = 8) {
 }
 
 // The year a country's card lists: the one asked for, if the data has it, else the
-// selected date's. In November the date's year is nearly all past, hence the choice.
-export function cardYear(data, date, year) {
-  return data.years.map(String).includes(String(year)) ? String(year) : date.slice(0, 4);
+// selected date's — unless the country (cc) has no nationwide holiday left in it, when
+// a card of nothing but "past" rows is worse than next year's, if the data has that.
+export function cardYear(data, date, year, cc) {
+  const ys = data.years.map(String);
+  if (ys.includes(String(year))) return String(year);
+  const y = date.slice(0, 4), after = String(+y + 1);
+  if (!cc) return y;
+  const nx = nextNational(data, cc, date);
+  return nx && nx.date.startsWith(after + '-') ? after : y;
 }
 export const yearHolidays = (data, cc, year) => upcoming(data, cc, `${year}-01-01`).filter((x) => x.date.startsWith(`${year}-`));
 
-export function encodeState({ date, cc, year, shared }, today) {
+// With data, the year is written when it differs from the card's own default for that
+// country (cardYear with no ask); without, when it differs from the date's year.
+export function encodeState({ date, cc, year, shared }, today, data) {
   const p = new URLSearchParams();
   if (date && date !== today) p.set('d', date);
   if (cc) p.set('c', cc);
   // written only when it differs from the date's year, so plain links stay plain
-  if (cc && year && String(year) !== (date || today).slice(0, 4)) p.set('y', String(year));
+  const dflt = data ? cardYear(data, date || today, null, cc) : (date || today).slice(0, 4);
+  if (cc && year && String(year) !== dflt) p.set('y', String(year));
   // a shared list rides along in every link until it is saved or put away
   if (shared && shared.length) p.set('p', shared.join(','));
   const q = p.toString().replace(/%2C/g, ',');
@@ -182,7 +191,7 @@ export function decodeState(search, data, today) {
   const date = d && inRange(data, d) ? d : clampDate(data, today);
   const cc = data.countries[c] ? c : null;
   const shared = parsePins(p.get('p'), data);
-  return { date, cc, year: cc && y && cardYear(data, date, y) !== date.slice(0, 4) ? y : null, shared: shared.length ? shared : null };
+  return { date, cc, year: cc && data.years.map(String).includes(y) && y !== cardYear(data, date, null, cc) ? y : null, shared: shared.length ? shared : null };
 }
 // The link that shows someone else your list: today, no country open, just ?p=.
 export const shareQuery = (pins) => (pins.length ? '?p=' + pins.join(',') : '');

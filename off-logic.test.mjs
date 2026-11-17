@@ -82,7 +82,19 @@ eq('state: a today outside the data clamps into it', L.decodeState('', fake, '20
   eq('state: the other year is written', L.encodeState({ date: '2026-11-12', cc: 'AA', year: '2027' }, '2026-11-12'), '?c=AA&y=2027');
   eq('state: the date\'s own year is not', L.encodeState({ date: '2026-11-12', cc: 'AA', year: '2026' }, '2026-11-12'), '?c=AA');
   eq('state: no year without a country', L.encodeState({ date: '2026-11-12', cc: null, year: '2027' }, '2026-11-12'), '');
-  eq('state: the year round-trips', L.decodeState('?c=AA&y=2027', two, '2026-11-12'), { date: '2026-11-12', cc: 'AA', year: '2027', shared: null });
+  eq('state: the year round-trips', L.decodeState('?c=AA&y=2027', two, '2026-03-01'), { date: '2026-03-01', cc: 'AA', year: '2027', shared: null });
+  // AA has nothing nationwide left after 12 Nov 2026; BB is given a Christmas so it does
+  const late = { ...two, h: { ...two.h, BB: [...(two.h.BB || []), ['2026-12-25', 'Christmas', null], ['2027-01-01', 'New Year', null]] } };
+  eq('card year: a year with nothing nationwide left opens the next', L.cardYear(late, '2026-11-12', null, 'AA'), '2027');
+  eq('card year: a year with some left stays', L.cardYear(late, '2026-11-12', null, 'BB'), '2026');
+  eq('card year: only a regional day left still opens the next',
+    L.cardYear({ ...late, h: { ...late.h, AA: [...late.h.AA, ['2026-12-01', 'Local Fair', ['N']]].sort() } }, '2026-11-12', null, 'AA'), '2027');
+  eq('card year: the last year of data has no next', L.cardYear(late, '2027-11-12', null, 'AA'), '2027');
+  eq('card year: an ask still wins', L.cardYear(late, '2026-11-12', '2026', 'AA'), '2026');
+  eq('state: asking for the date\'s year where the default moved on is written',
+    L.encodeState({ date: '2026-11-12', cc: 'AA', year: '2026' }, '2026-11-12', late), '?c=AA&y=2026');
+  eq('state: asking for the default is not', L.encodeState({ date: '2026-11-12', cc: 'AA', year: '2027' }, '2026-11-12', late), '?c=AA');
+  eq('state: the moved-on default round-trips', [L.decodeState('?c=AA&y=2026', late, '2026-11-12').year, L.decodeState('?c=AA', late, '2026-11-12').year], ['2026', null]);
   eq('state: a year not in the data falls back', L.decodeState('?c=AA&y=2031', two, '2026-11-12').year, null);
 }
 
