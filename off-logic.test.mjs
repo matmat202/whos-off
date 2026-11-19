@@ -283,5 +283,40 @@ ok('rows are sorted by date', Object.values(D.h).every((rows) => rows.every((r, 
   eq('every leave day is a working weekday, every span adds up', bad, []);
 }
 
+// --- the pin cap, the link's default year, and how far ahead "next" looks ---------------
+// Added 2026-11-19 for mutwatch: MAX_PINS, cardYear, dayFor, pinsOff, shareQuery,
+// sharedDiffers, togglePin and yearHolidays were all named as exports the equivalence
+// sweep never reaches, and five mutants were surviving. Each case names the one it kills.
+{
+  const many = { countries: Object.fromEntries(Array.from({ length: 25 }, (_, i) => [`C${String(i).padStart(2, '0')}`, ['X', [5, 6]]])) };
+  const codes = Object.keys(many.countries);
+  // kills L204 `MAX_PINS = 20` -> `21` AND L213 `out.length >= MAX_PINS` -> `>` (which
+  // pushes one more before breaking, so the cap leaks by exactly one)
+  eq('parsePins keeps at most MAX_PINS codes', L.parsePins(JSON.stringify(codes), many).length, 20);
+  eq('parsePins keeps the first twenty, in order', L.parsePins(JSON.stringify(codes), many)[19], codes[19]);
+  eq('togglePin will not grow the list past MAX_PINS', L.togglePin(codes.slice(0, 20), codes[24]).length, 20);
+  eq('parsePins reads the bare "US,GB" form as well as JSON', L.parsePins('c00,C01', many), ['C00', 'C01']);
+  eq('parsePins drops unknown codes and duplicates, keeping order', L.parsePins('C01,ZZ,C00,C01', many), ['C01', 'C00']);
+
+  // kills BOTH `||` on L181. With no date the link's default year is TODAY's, so a link
+  // whose year already matches stays plain; `&&` makes the default empty and every such
+  // link grows a redundant ?y=.
+  eq('encodeState writes no ?y= when the year is already the default, with no data',
+     L.encodeState({ date: '', cc: 'AA', year: 2026 }, '2026-11-19', null), '?c=AA');
+  eq('encodeState writes no ?y= when the year is already the default, with data',
+     L.encodeState({ date: '', cc: 'AA', year: 2026 }, '2026-11-19', fake), '?c=AA');
+  ok('encodeState does write ?y= when the year differs from the default',
+     L.encodeState({ date: '', cc: 'AA', year: 2027 }, '2026-11-19', null).includes('y=2027'),
+     L.encodeState({ date: '', cc: 'AA', year: 2027 }, '2026-11-19', null));
+
+  // kills L224 `addDays(s, 1)` -> `2`: "next" starts the day AFTER s, so a holiday on the
+  // very next day is the answer; searching from s+2 steps straight over it.
+  const fidx = L.index(fake);
+  eq('dayFor finds a national holiday falling the very next day',
+     (L.dayFor(fake, fidx, 'AA', '2026-05-31').next || {}).date, '2026-06-01');
+  eq('dayFor does not offer today’s own holiday as the next one',
+     (L.dayFor(fake, fidx, 'AA', '2026-06-01').next || {}).date, undefined);
+}
+
 console.log(`${fail ? 'FAIL' : 'ok'} off-logic: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
