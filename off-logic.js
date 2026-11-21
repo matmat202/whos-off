@@ -232,3 +232,12 @@ export function dayFor(data, idx, cc, s) {
 }
 // How many pinned countries have a nationwide holiday on s (the strip's marker).
 export const pinsOff = (data, idx, pins, s) => pins.filter((cc) => dayFor(data, idx, cc, s).kind === 'holiday').length;
+// The first day from s (inclusive) on which none of pins has a holiday or weekend — the
+// day for the call. Regional holidays and make-up days count as worked. null: none in range.
+export function clearDay(data, idx, pins, s) {
+  const { last } = range(data);
+  for (let d = s; d <= last; d = addDays(d, 1)) {
+    if (pins.every((cc) => { const k = dayFor(data, idx, cc, d).kind; return k !== 'holiday' && k !== 'weekend'; })) return d;
+  }
+  return null;
+}

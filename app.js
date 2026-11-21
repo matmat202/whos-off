@@ -75,6 +75,7 @@ function drawMine() {
   const offN = days.filter((x) => x.kind === 'holiday' || x.kind === 'weekend').length;
   $('minehead').textContent = `${S.shared ? 'Shared list' : 'Your countries'} · ${L.fmtDate(S.date)} · ${offN ? `${offN} of ${list.length} off` : 'all working'}`;
   drawMineActions();
+  drawClear(list);
   $('minelist').replaceChildren(...days.map((x) => {
     const li = h('li'), b = h('button'); b.type = 'button';
     const [cls, label] = STATUS[x.kind];
@@ -88,6 +89,21 @@ function drawMine() {
     li.append(b);
     return li;
   }));
+}
+
+// The question the list is for: when can they all take the call?
+function drawClear(list) {
+  const p = $('mineclear'), who = list.length === 1 ? 'it' : list.length === 2 ? 'both' : `all ${list.length}`;
+  const d = L.clearDay(D, IDX, list, S.date);
+  p.textContent = '';
+  if (d === S.date) p.append(`None is off this day — ${who} working.`);
+  else if (!d) p.append(`No day through ${D.years[D.years.length - 1]} with ${who} working.`);
+  else {
+    const b = h('button', null, L.fmtDate(d)); b.type = 'button'; b.id = 'gotoclear';
+    b.addEventListener('click', () => setState({ date: d }));
+    const gap = L.daysBetween(S.date, d);
+    p.append(`First day ${who} ${list.length === 1 ? 'is' : 'are'} working: `, b, ` (${gap} ${gap === 1 ? 'day' : 'days'} later)`);
+  }
 }
 
 function drawMineActions() {

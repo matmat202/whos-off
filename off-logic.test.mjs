@@ -318,5 +318,18 @@ ok('rows are sorted by date', Object.values(D.h).every((rows) => rows.every((r, 
      (L.dayFor(fake, fidx, 'AA', '2026-06-01').next || {}).date, undefined);
 }
 
+// Added 2026-11-21: clearDay, the first day none of a list is off.
+{
+  const c = (pins, s) => L.clearDay(fake, fi, pins, s);
+  eq('clear day: a holiday, a Fri–Sat weekend and a Sunday all block; Monday is clear', c(['AA', 'BB'], '2026-05-01'), '2026-05-04');
+  eq('clear day: the start day itself counts', c(['DD'], '2026-05-04'), '2026-05-04');
+  eq('clear day: a make-up Saturday is worked', c(['AA'], '2026-05-02'), '2026-05-02');
+  eq('clear day: a regional holiday is not a day off', c(['CC'], '2026-05-01'), '2026-05-01');
+  eq('clear day: steps over a weekend to the Monday', c(['AA'], '2026-12-26'), '2026-12-28');
+  const closed = { ...fake, countries: { ...fake.countries, ZZ: ['Zulu', [0, 1, 2, 3, 4, 5, 6]] }, h: { ...fake.h, ZZ: [] } };
+  eq('clear day: none left in range is null, not the last day', L.clearDay(closed, L.index(closed), ['AA', 'ZZ'], '2026-12-20'), null);
+  eq('clear day: an empty list is clear at once', c([], '2026-05-01'), '2026-05-01');
+}
+
 console.log(`${fail ? 'FAIL' : 'ok'} off-logic: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

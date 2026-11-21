@@ -97,6 +97,8 @@ ul.list .r{grid-column:2;color:var(--ink-3);font-size:12px}
 .mine .s.part{color:var(--ink)}
 .mine .s.on{color:var(--ink-2)}
 .mine .nx{grid-column:2/4;font-size:12px;color:var(--ink-3)}
+.mine .clear{font-size:13px;color:var(--ink-2);margin:8px 2px 0;line-height:1.5}
+.mine .clear button{border:1px solid var(--accent);background:var(--card);color:var(--accent);border-radius:8px;padding:3px 8px;font-size:13px;font-weight:600}
 .mine.shared{border:2px dashed var(--accent)}
 .mineact{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:8px 0 0}
 .mineact button{border:1px solid var(--line);background:var(--card);color:var(--ink-2);border-radius:8px;padding:5px 10px;font-size:12px}
@@ -132,6 +134,7 @@ input,select,textarea{font-size:16px!important}
 <section class="mine" id="mine" aria-labelledby="minehead" hidden>
   <h2 id="minehead"></h2>
   <ul id="minelist"></ul>
+  <p class="clear" id="mineclear"></p>
   <div class="mineact" id="mineact"></div>
   <p class="tag" id="sharemsg" aria-live="polite"></p>
 </section>
