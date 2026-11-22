@@ -329,6 +329,11 @@ ok('rows are sorted by date', Object.values(D.h).every((rows) => rows.every((r, 
   const closed = { ...fake, countries: { ...fake.countries, ZZ: ['Zulu', [0, 1, 2, 3, 4, 5, 6]] }, h: { ...fake.h, ZZ: [] } };
   eq('clear day: none left in range is null, not the last day', L.clearDay(closed, L.index(closed), ['AA', 'ZZ'], '2026-12-20'), null);
   eq('clear day: an empty list is clear at once', c([], '2026-05-01'), '2026-05-01');
+  // The other side of the null test above: the loop runs to `last` INCLUSIVE, so the final
+  // day of the data can itself be the answer. `d <= last` -> `d < last` survived the suite
+  // until 2026-11-21 because every other case here is answered well before the range ends.
+  eq('clear day: the last day of the range can itself be the clear day',
+     c(['AA'], L.range(fake).last), '2026-12-31');
 }
 
 console.log(`${fail ? 'FAIL' : 'ok'} off-logic: ${pass} passed, ${fail} failed`);
