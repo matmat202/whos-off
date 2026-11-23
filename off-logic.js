@@ -72,6 +72,13 @@ export function regionsLabel(names, max = 3) {
   return `${names.slice(0, max).join(', ')} and ${names.length - max} more`;
 }
 
+// A pinned country's regional day in one line. Past three places a count says more than a
+// list does — "in 6 regions" answers "can I call Germany"; "Bavaria, Hesse and 4 more" less so.
+export function regionalLine(x) {
+  const where = x.subs.length > 3 ? `${x.regions || x.subs.length} regions` : regionsLabel(x.subs);
+  return `${x.name}${x.more ? ` and ${x.more} other ${x.more === 1 ? 'holiday' : 'holidays'}` : ''}, in ${where}`;
+}
+
 const byCountry = (data) => (a, b) => countryName(data, a.cc).localeCompare(countryName(data, b.cc), 'en');
 
 // Everything the day view shows.
@@ -226,12 +233,25 @@ export function dayFor(data, idx, cc, s) {
   const w = weekday(s), makeup = ((data.work || {})[cc] || []).includes(s);
   if (data.countries[cc][1].includes(w) && !makeup) return { cc, kind: 'weekend', next };
   if (makeup) return { cc, kind: 'makeup', next };
-  const reg = rows.find((r) => r.subs);
-  if (reg) return { cc, kind: 'regional', name: reg.name, subs: reg.subs.map((x) => subName(data, cc, x)), next };
+  // Every regional row, not the first: the day after Thanksgiving is eight US holidays in
+  // sixteen states, and the first row alone said "in Maryland". The widest one leads.
+  const reg = rows.filter((r) => r.subs).sort((a, b) => b.subs.length - a.subs.length);
+  if (reg.length) {
+    const codes = [...new Set(reg.flatMap((r) => r.subs))];
+    const more = new Set(reg.map((r) => r.name)).size - 1;
+    // `regions` counts real subdivision codes only: the library files a few cities beside
+    // their region (Augsburg in Bavaria, Barcelona in Catalonia), and counting those says
+    // Corpus Christi is off in 7 German states when it is 6.
+    const regions = codes.filter((x) => /^[A-Z0-9]{1,3}$/.test(x)).length;
+    return { cc, kind: 'regional', name: reg[0].name, more, subs: codes.map((x) => subName(data, cc, x)), regions, next };
+  }
   return { cc, kind: 'working', next };
 }
 // How many pinned countries have a nationwide holiday on s (the strip's marker).
 export const pinsOff = (data, idx, pins, s) => pins.filter((cc) => dayFor(data, idx, cc, s).kind === 'holiday').length;
+// Which of pins are off only in some regions on s: the clear day treats them as working,
+// so the line saying so must name them.
+export const partOff = (data, idx, pins, s) => pins.filter((cc) => dayFor(data, idx, cc, s).kind === 'regional');
 // The first day from s (inclusive) on which none of pins has a holiday or weekend — the
 // day for the call. Regional holidays and make-up days count as worked. null: none in range.
 export function clearDay(data, idx, pins, s) {

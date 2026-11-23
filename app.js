@@ -80,7 +80,7 @@ function drawMine() {
     const li = h('li'), b = h('button'); b.type = 'button';
     const [cls, label] = STATUS[x.kind];
     b.append(h('span', 'f', L.flag(x.cc)), h('span', 'c', L.countryName(D, x.cc)), h('span', 's ' + cls, label));
-    let detail = x.kind === 'holiday' ? x.name : x.kind === 'regional' ? `${x.name}, in ${L.regionsLabel(x.subs)}` : '';
+    let detail = x.kind === 'holiday' ? x.name : x.kind === 'regional' ? L.regionalLine(x) : '';
     const gap = x.next && L.daysBetween(S.date, x.next.date);
     const nx = x.next ? `next: ${x.next.name}, ${L.fmtDate(x.next.date)} (${S.date === TODAY ? L.inWords(gap) : `${gap} ${gap === 1 ? 'day' : 'days'} later`})` : '';
     if (L.NOTES[x.cc]) detail = L.NOTES[x.cc];
@@ -96,13 +96,15 @@ function drawClear(list) {
   const p = $('mineclear'), who = list.length === 1 ? 'it' : list.length === 2 ? 'both' : `all ${list.length}`;
   const d = L.clearDay(D, IDX, list, S.date);
   p.textContent = '';
-  if (d === S.date) p.append(`None is off this day — ${who} working.`);
+  const part = d ? L.partOff(D, IDX, list, d).map((cc) => L.countryName(D, cc)) : [];
+  const but = part.length ? ` Not everywhere: part of ${L.regionsLabel(part)} ${part.length === 1 ? 'is' : 'are'} off.` : '';
+  if (d === S.date) p.append(`None is off nationwide this day — ${who} working.${but}`);
   else if (!d) p.append(`No day through ${D.years[D.years.length - 1]} with ${who} working.`);
   else {
     const b = h('button', null, L.fmtDate(d)); b.type = 'button'; b.id = 'gotoclear';
     b.addEventListener('click', () => setState({ date: d }));
     const gap = L.daysBetween(S.date, d);
-    p.append(`First day ${who} ${list.length === 1 ? 'is' : 'are'} working: `, b, ` (${gap} ${gap === 1 ? 'day' : 'days'} later)`);
+    p.append(`First day ${who} ${list.length === 1 ? 'is' : 'are'} working: `, b, ` (${gap} ${gap === 1 ? 'day' : 'days'} later).${but}`);
   }
 }
 

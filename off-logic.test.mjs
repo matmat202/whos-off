@@ -336,5 +336,38 @@ ok('rows are sorted by date', Object.values(D.h).every((rows) => rows.every((r, 
      c(['AA'], L.range(fake).last), '2026-12-31');
 }
 
+// Added 2026-11-22: a pinned country's regional day merges EVERY regional row. The live
+// card said the US day after Thanksgiving was "American Indian Heritage Day, in Maryland"
+// -- the first of eight rows -- when sixteen states were off, and the clear-day line then
+// called the day clear with no word that half the country was not.
+{
+  const w = {
+    years: [2026],
+    countries: { RR: ['Romeo', [5, 6]], SS: ['Sierra', [5, 6]] },
+    sub: { RR: { A: 'Ash', B: 'Birch', C: 'Cedar', D: 'Dogwood', E: 'Elm', Town: 'Elm Town' } },
+    h: {
+      RR: [['2026-11-27', 'Small Day', ['A']], ['2026-11-27', 'Big Day', ['B', 'C', 'D']], ['2026-11-27', 'Other Day', ['E', 'Town']],
+           ['2026-11-30', 'Twin Day', ['A']], ['2026-11-30', 'Twin Day', ['B']], ['2026-12-01', 'Lone Day', ['A', 'B']]],
+      SS: [],
+    },
+    work: {},
+  };
+  const wi = L.index(w), x = L.dayFor(w, wi, 'RR', '2026-11-27');
+  eq('regional merge: the widest holiday leads, not the first row', x.name, 'Big Day');
+  eq('regional merge: every region off is named, widest first', x.subs, ['Birch', 'Cedar', 'Dogwood', 'Elm', 'Elm Town', 'Ash']);
+  eq('regional merge: the other holidays are counted', x.more, 2);
+  eq('regional merge: a city filed beside its region is not counted as a region', x.regions, 5);
+  eq('regional line: past three places, a count', L.regionalLine(x), 'Big Day and 2 other holidays, in 5 regions');
+  const twin = L.dayFor(w, wi, 'RR', '2026-11-30');
+  eq('regional merge: one name in two rows is one holiday', [twin.more, twin.subs], [0, ['Ash', 'Birch']]);
+  eq('regional line: one holiday, few places, listed', L.regionalLine(twin), 'Twin Day, in Ash and Birch');
+  eq('regional line: one other holiday is singular',
+     L.regionalLine({ name: 'X', more: 1, subs: ['P'], regions: 1 }), 'X and 1 other holiday, in P');
+  eq('regional line: cities only still give a count', L.regionalLine({ name: 'X', more: 0, subs: ['a', 'b', 'c', 'd'], regions: 0 }), 'X, in 4 regions');
+  eq('part off: only the regional ones, in list order', L.partOff(w, wi, ['SS', 'RR'], '2026-12-01'), ['RR']);
+  eq('part off: a weekend is not part off', L.partOff(w, wi, ['RR'], '2026-11-28'), []);
+  eq('part off: the clear day is still the regional day', L.clearDay(w, wi, ['RR', 'SS'], '2026-11-27'), '2026-11-27');
+}
+
 console.log(`${fail ? 'FAIL' : 'ok'} off-logic: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
