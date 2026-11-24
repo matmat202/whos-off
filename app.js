@@ -108,6 +108,22 @@ function drawClear(list) {
   }
 }
 
+// A calendar file of the countries' nationwide holidays, made here and saved, never sent.
+function saveICS(ccs) {
+  const p = (x) => String(x).padStart(2, '0'), n = new Date();
+  const stamp = `${n.getUTCFullYear()}${p(n.getUTCMonth() + 1)}${p(n.getUTCDate())}T${p(n.getUTCHours())}${p(n.getUTCMinutes())}${p(n.getUTCSeconds())}Z`;
+  const url = URL.createObjectURL(new Blob([L.toICS(D, ccs, stamp, location.origin + location.pathname)], { type: 'text/calendar' }));
+  const a = h('a'); a.href = url; a.download = L.icsFile(ccs);
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+const calButton = (id, text, ccs) => {
+  const b = h('button', null, text); b.type = 'button'; b.id = id;
+  b.title = `Every nationwide public holiday through ${D.years[D.years.length - 1]}, as a file your calendar app imports`;
+  b.addEventListener('click', () => saveICS(ccs));
+  return b;
+};
+
 function drawMineActions() {
   const act = $('mineact'), msg = $('sharemsg');
   const btn = (id, text, fn) => { const b = h('button', null, text); b.type = 'button'; b.id = id; b.addEventListener('click', fn); return b; };
@@ -115,7 +131,8 @@ function drawMineActions() {
     msg.textContent = '';
     act.replaceChildren(h('span', 'tag', PINS.length ? 'Opened from a link — your own countries are kept.' : 'Opened from a link.'),
       btn('savelist', PINS.length ? 'Make these my countries' : 'Keep these as my countries', () => { PINS = [...S.shared]; savePins(); setState({ shared: null }); }),
-      btn('droplist', PINS.length ? 'Back to mine' : 'Put away', () => setState({ shared: null })));
+      btn('droplist', PINS.length ? 'Back to mine' : 'Put away', () => setState({ shared: null })),
+      ...(S.shared.some((cc) => !L.NOTES[cc]) ? [calButton('calmine', '📅 Add to calendar', S.shared)] : []));
     return;
   }
   act.replaceChildren(btn('sharelist', 'Share this list', async () => {
@@ -124,7 +141,7 @@ function drawMineActions() {
     try { await navigator.clipboard.writeText(url); ok = true; } catch { /* no clipboard: show the link to copy by hand */ }
     msg.textContent = ok ? 'Link copied — whoever opens it sees these countries, without losing their own.' : 'Copy this link: ';
     if (!ok) { const a = h('a', null, url); a.href = url; msg.append(a); }
-  }));
+  }), ...(PINS.some((cc) => !L.NOTES[cc]) ? [calButton('calmine', '📅 Add all to calendar', PINS)] : []));
 }
 
 function countryButton(cc, holiday, regions) {
@@ -178,7 +195,9 @@ function drawCountry() {
   pin.setAttribute('aria-pressed', String(pinned));
   pin.title = pinned ? 'Remove from your countries' : 'Keep at the top of the page, in this browser';
   pin.addEventListener('click', () => { PINS = L.togglePin(PINS, cc); savePins(); render(); });
-  const head = h('h2'); head.append(h('span', null, L.flag(cc)), `${L.countryName(D, cc)} in ${year}`, pin, close);
+  const head = h('h2'); head.append(h('span', null, L.flag(cc)), `${L.countryName(D, cc)} in ${year}`, pin);
+  if (!L.NOTES[cc]) head.append(calButton('cal', '📅 Calendar', [cc]));
+  head.append(close);
   const yrs = h('div', 'yrs'); yrs.setAttribute('role', 'group'); yrs.setAttribute('aria-label', 'Year');
   for (const y of D.years.map(String)) {
     const b = h('button', null, y); b.type = 'button'; b.setAttribute('aria-pressed', String(y === year));

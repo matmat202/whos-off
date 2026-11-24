@@ -261,3 +261,46 @@ export function clearDay(data, idx, pins, s) {
   }
   return null;
 }
+
+// --- calendar export (.ics, RFC 5545) ----------------------------------------------------
+// Every nationwide holiday of the listed countries, through all shipped years, as all-day
+// events a calendar app can subscribe to by import. Regional ones are left out: a country
+// like the US would bury its 11 national days under 200 state ones. Events are TRANSPARENT,
+// so a holiday abroad never marks you busy. Countries with a NOTE are skipped. `stamp` is the DTSTAMP, 'YYYYMMDDTHHMMSSZ'.
+export const icsText = (s) => String(s).replace(/\\/g, '\\\\').replace(/;/g, '\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+// Lines longer than 75 octets fold onto continuation lines that start with one space. Cut
+// on code points, never inside one: names here run to 127 bytes, some of them non-ASCII.
+export function icsFold(line) {
+  const enc = new TextEncoder(), out = [];
+  let cur = '', n = 0;
+  for (const ch of line) {
+    const b = enc.encode(ch).length;
+    if (n + b > 75) { out.push(cur); cur = ' '; n = 1; }
+    cur += ch; n += b;
+  }
+  out.push(cur);
+  return out.join('\r\n');
+}
+// A UID that survives a rebuild, so importing the file again updates rather than doubles.
+const uidHash = (s) => { let x = 5381; for (const ch of s) x = ((x * 33) ^ ch.codePointAt(0)) >>> 0; return x.toString(36); };
+export const icsName = (data, ccs) => ccs.length === 1 ? `${countryName(data, ccs[0])} public holidays`
+  : `Public holidays: ${regionsLabel(ccs.map((cc) => countryName(data, cc)), 3)}`;
+export const icsFile = (ccs) => `whos-off-${ccs.slice(0, 4).join('-')}${ccs.length > 4 ? `-and-${ccs.length - 4}-more` : ''}.ics`;
+export function toICS(data, ccs, stamp, url = 'https://matmat202.github.io/whos-off/') {
+  const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//matmat202//Whos Off//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+    `X-WR-CALNAME:${icsText(icsName(data, ccs))}`];
+  for (const cc of ccs) {
+    if (NOTES[cc]) continue; // Ukraine: its holidays are suspended, so a list of them would mislead
+    const name = countryName(data, cc);
+    for (const [d, hol, subs] of data.h[cc] || []) {
+      if (subs) continue;
+      L.push('BEGIN:VEVENT', `UID:${d}-${cc}-${uidHash(hol)}@whos-off`, `DTSTAMP:${stamp}`,
+        `DTSTART;VALUE=DATE:${d.replace(/-/g, '')}`, `DTEND;VALUE=DATE:${addDays(d, 1).replace(/-/g, '')}`,
+        `SUMMARY:${icsText(`${name}: ${hol}`)}`,
+        `DESCRIPTION:${icsText(`Public holiday in ${name}, nationwide.${/estimated/.test(hol) ? ' Estimated: it depends on a moon sighting and can move by a day.' : ''} From Who's Off, ${url} (holidays library ${data.version}).`)}`,
+        'TRANSP:TRANSPARENT', 'END:VEVENT');
+    }
+  }
+  L.push('END:VCALENDAR');
+  return L.map(icsFold).join('\r\n') + '\r\n';
+}

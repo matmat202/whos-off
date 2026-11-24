@@ -369,5 +369,58 @@ ok('rows are sorted by date', Object.values(D.h).every((rows) => rows.every((r, 
   eq('part off: the clear day is still the regional day', L.clearDay(w, wi, ['RR', 'SS'], '2026-11-27'), '2026-11-27');
 }
 
+// --- calendar export -------------------------------------------------------------------
+{
+  // An unfolder and unescaper written from RFC 5545 here, not borrowed from the logic.
+  const lines = (t) => t.split('\r\n');
+  const unfold = (t) => t.replace(/\r\n /g, '');
+  const unesc = (v) => v.replace(/\\(.)/g, (_, c) => (c === 'n' ? '\n' : c));
+  const events = (t) => unfold(t).split('BEGIN:VEVENT').slice(1).map((e) => Object.fromEntries(
+    e.split('\r\n').filter((l) => /^[A-Z]/.test(l) && !l.startsWith('END:')).map((l) => { const i = l.indexOf(':'); return [l.slice(0, i), unesc(l.slice(i + 1))]; })));
+  const w = {
+    years: [2026], version: '9.9',
+    countries: { AA: ['Alpha, the; Back\\slash land', [5, 6]], UA: ['Ukraine', [5, 6]], CC: ['Charlie', [5, 6]] },
+    sub: { CC: { N: 'North' } },
+    h: {
+      AA: [['2026-02-28', 'Leap-ish Day', null], ['2026-05-01', 'Labour Day', null], ['2026-05-01', 'Saint Day', null],
+           ['2026-12-31', 'Ünïcødé Ëvé of the Very Long Name That Will Not Fit On One Line ✓ (observed, estimated)', null]],
+      UA: [['2026-01-01', "New Year's Day", null]],
+      CC: [['2026-05-01', 'Northern Day', ['N']], ['2026-07-01', 'Charlie Day', null]],
+    },
+    work: {},
+  };
+  const t = L.toICS(w, ['AA', 'UA', 'CC'], '20261123T120000Z');
+  const ev = events(t);
+  ok('ics: CRLF only, ends with one', !/[^\r]\n/.test(t) && t.endsWith('END:VCALENDAR\r\n'));
+  ok('ics: no line over 75 octets', lines(t).every((l) => new TextEncoder().encode(l).length <= 75),
+     JSON.stringify(lines(t).filter((l) => new TextEncoder().encode(l).length > 75)));
+  ok('ics: a fold never splits a character', lines(t).every((l) => { try { new TextDecoder('utf-8', { fatal: true }).decode(new TextEncoder().encode(l)); return !l.includes('�'); } catch { return false; } }));
+  ok('ics: the long name really was folded', lines(t).some((l) => l.startsWith(' ')));
+  eq('ics: nationwide only, regional and suspended countries left out', ev.map((e) => e['DTSTART;VALUE=DATE']),
+     ['20260228', '20260501', '20260501', '20261231', '20260701']);
+  eq('ics: all-day, ending the next day across a month and a year', ev.map((e) => e['DTEND;VALUE=DATE']),
+     ['20260301', '20260502', '20260502', '20270101', '20260702']);
+  eq('ics: summary names the country, escaped and back', ev[0].SUMMARY, 'Alpha, the; Back\\slash land: Leap-ish Day');
+  eq('ics: a long unicode name survives fold and unfold', ev[3].SUMMARY, `${w.countries.AA[0]}: ${w.h.AA[3][1]}`);
+  ok('ics: an estimated date says so', /moon sighting/.test(ev[3].DESCRIPTION) && !/moon/.test(ev[1].DESCRIPTION), ev[3].DESCRIPTION);
+  eq('ics: two holidays on one day get two UIDs', new Set(ev.map((e) => e.UID)).size, ev.length);
+  eq('ics: UIDs are stable across runs', events(L.toICS(w, ['AA', 'CC'], '20300101T000000Z')).map((e) => e.UID), ev.map((e) => e.UID));
+  ok('ics: never marks you busy, and stamped', ev.every((e) => e.TRANSP === 'TRANSPARENT' && e.DTSTAMP === '20261123T120000Z'));
+  eq('ics: calendar name', [L.icsName(w, ['CC']), L.icsName(w, ['CC', 'UA'])], ['Charlie public holidays', 'Public holidays: Charlie and Ukraine']);
+  eq('ics: file names', [L.icsFile(['JP']), L.icsFile(['JP', 'DE', 'US', 'GB', 'FR', 'IN'])], ['whos-off-JP.ics', 'whos-off-JP-DE-US-GB-and-2-more.ics']);
+  eq('ics: escaping', L.icsText('a,b;c\\d\ne'), 'a\\,b\;c\\\\d\\ne');
+
+  // shipped data: Japan, every nationwide day of both years, and today's
+  const D = JSON.parse(readFileSync(fileURLToPath(new URL('./data/holidays.json', import.meta.url)), 'utf8'));
+  const jp = events(L.toICS(D, ['JP'], '20261123T000000Z'));
+  eq('ics: Japan has every nationwide holiday, both years', jp.length, D.h.JP.filter((x) => !x[2]).length);
+  ok('ics: Japan spans the shipped years', jp[0]['DTSTART;VALUE=DATE'].startsWith(String(D.years[0])) && jp.at(-1)['DTSTART;VALUE=DATE'].startsWith(String(D.years.at(-1))));
+  ok('ics: Labor Thanksgiving Day, 23 Nov 2026', jp.some((e) => e['DTSTART;VALUE=DATE'] === '20261123' && e.SUMMARY === 'Japan: Labor Thanksgiving Day'));
+  const all = L.toICS(D, Object.keys(D.countries), '20261123T000000Z');
+  ok('ics: every country at once, no line over 75 octets', all.split('\r\n').every((l) => new TextEncoder().encode(l).length <= 75));
+  const uids = events(all).map((e) => e.UID);
+  eq('ics: every country at once, every UID unique', uids.length - new Set(uids).size, 0);
+}
+
 console.log(`${fail ? 'FAIL' : 'ok'} off-logic: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
